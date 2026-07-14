@@ -1,0 +1,25 @@
+<% var pageTitle = 'Tạo đề thi mới' %>
+<%- include('../../partials/admin-header') %>
+<div class="card p-4" style="max-width:500px">
+  <form method="POST" action="/admin/phong-thi">
+    <div class="mb-3"><label class="form-label">Tên đề thi</label>
+      <input name="title" class="form-control" placeholder="Vd: Đề thi thử Toán 10 - Học kỳ I" required></div>
+    <div class="mb-3"><label class="form-label">Danh mục (Lớp/Môn, tùy chọn)</label>
+      <select name="category_id" class="form-select">
+        <option value="">-- Không chọn --</option>
+        <% function renderCat(cats, depth) { %>
+          <% cats.forEach(c => { %>
+            <option value="<%= c.id %>"><%= '\u00A0\u00A0\u00A0\u00A0'.repeat(depth) %><%= depth>0?'↳ ':'' %><%= c.name %></option>
+            <% if (c.children && c.children.length) renderCat(c.children, depth+1) %>
+          <% }) %>
+        <% } %>
+        <% renderCat(categories, 0) %>
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label">Điểm tối thiểu để đạt</label>
+      <input type="number" step="0.1" name="pass_score" class="form-control" value="5" min="0"></div>
+    <button class="btn btn-primary">Tạo đề thi</button>
+    <a href="/admin/phong-thi" class="btn btn-outline-secondary">Hủy</a>
+  </form>
+</div>
+<%- include('../../partials/admin-footer') %>

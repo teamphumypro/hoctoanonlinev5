@@ -10,7 +10,7 @@
       Rà lại từng câu bên dưới — sửa nội dung, đổi dạng câu hỏi, hoặc bỏ tick "Giữ câu này" để loại câu nhận diện sai.
     </div>
   </div>
-  <a href="/admin/bai-hoc/<%= lesson.id %>/bai-kiem-tra" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
+  <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
 </div>
 
 <% if (aiError) { %>
@@ -21,7 +21,7 @@
 <% } %>
 
 <form method="POST" action="/admin/bai-kiem-tra/luu-de-import">
-  <input type="hidden" name="lesson_id" value="<%= lesson.id %>">
+  <input type="hidden" name="redirect_to" value="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>">
   <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
 
   <% questions.forEach((q, i) => { %>

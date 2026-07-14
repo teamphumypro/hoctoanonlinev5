@@ -22,12 +22,28 @@ exports.activationCodes = async (req, res) => {
 };
 
 exports.generateActivationCodes = async (req, res) => {
-  const { course_id, quantity } = req.body;
+  const { course_id, quantity, expiry_days } = req.body;
   const qty = Math.min(parseInt(quantity) || 1, 200);
+  let expires_at = null;
+  if (expiry_days && parseInt(expiry_days) > 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + parseInt(expiry_days));
+    expires_at = d.toISOString();
+  }
   for (let i = 0; i < qty; i++) {
-    await ActivationCode.create(genActivationCode(), course_id);
+    await ActivationCode.create(genActivationCode(), course_id, expires_at);
   }
   res.redirect(`/admin/ma-kich-hoat?course_id=${course_id}`);
+};
+
+exports.deactivateActivationCode = async (req, res) => {
+  await ActivationCode.deactivate(req.params.id);
+  res.redirect(req.get('referer') || '/admin/ma-kich-hoat');
+};
+
+exports.reactivateActivationCode = async (req, res) => {
+  await ActivationCode.reactivate(req.params.id);
+  res.redirect(req.get('referer') || '/admin/ma-kich-hoat');
 };
 
 exports.deleteActivationCode = async (req, res) => {

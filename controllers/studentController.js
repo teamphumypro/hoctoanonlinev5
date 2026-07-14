@@ -51,7 +51,11 @@ exports.redeem = async (req, res) => {
   const code = (req.body.code || '').trim().toUpperCase();
   const activation = await ActivationCode.findByCode(code);
   if (!activation) return res.render('student/redeem', { error: 'Mã kích hoạt không tồn tại.', success: null });
+  if (!activation.is_active) return res.render('student/redeem', { error: 'Mã kích hoạt này đã bị vô hiệu hóa.', success: null });
   if (activation.is_used) return res.render('student/redeem', { error: 'Mã kích hoạt này đã được sử dụng.', success: null });
+  if (activation.expires_at && new Date(activation.expires_at) < new Date()) {
+    return res.render('student/redeem', { error: 'Mã kích hoạt này đã hết hạn sử dụng.', success: null });
+  }
   await ActivationCode.markUsed(activation.id, req.session.user.id);
   await Enrollment.create(req.session.user.id, activation.course_id);
   const course = await Course.findById(activation.course_id);

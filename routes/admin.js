@@ -37,9 +37,9 @@ router.get('/danh-muc', categoryController.list);
 router.get('/danh-muc/them-moi', requireRole('admin'), categoryController.newForm);
 router.post('/danh-muc', requireRole('admin'), categoryController.create);
 router.get('/danh-muc/:id/sua', requireRole('admin'), categoryController.editForm);
+router.post('/danh-muc/sap-xep', requireRole('admin'), categoryController.reorder);
 router.post('/danh-muc/:id', requireRole('admin'), categoryController.update);
 router.post('/danh-muc/:id/xoa', requireRole('admin'), categoryController.delete);
-router.post('/danh-muc/sap-xep', requireRole('admin'), categoryController.reorder);
 
 // ---- Khoa hoc ----
 router.get('/khoa-hoc', courseController.list);
@@ -50,6 +50,14 @@ router.post('/khoa-hoc/:id', requireRole('teacher'), uploadThumbnail.single('thu
 router.post('/khoa-hoc/:id/xoa', requireRole('admin'), courseController.delete);
 
 // ---- Sach ----
+router.get('/doc-sach-online', requireRole('teacher'), adminBookController.onlineReadingList);
+router.get('/sach/danh-muc', requireRole('admin'), adminBookController.categories);
+router.get('/sach/danh-muc/them-moi', requireRole('admin'), adminBookController.categoryNewForm);
+router.post('/sach/danh-muc', requireRole('admin'), adminBookController.categoryCreate);
+router.get('/sach/danh-muc/:id/sua', requireRole('admin'), adminBookController.categoryEditForm);
+router.post('/sach/danh-muc/sap-xep', requireRole('admin'), adminBookController.categoryReorder);
+router.post('/sach/danh-muc/:id', requireRole('admin'), adminBookController.categoryUpdate);
+router.post('/sach/danh-muc/:id/xoa', requireRole('admin'), adminBookController.categoryDelete);
 router.get('/sach/loai', requireRole('admin'), adminBookController.bookTypes);
 router.post('/sach/loai', requireRole('admin'), adminBookController.bookTypeCreate);
 router.post('/sach/loai/:id/xoa', requireRole('admin'), adminBookController.bookTypeDelete);
@@ -60,18 +68,38 @@ router.get('/sach/:id/sua', requireRole('teacher'), adminBookController.editForm
 router.post('/sach/:id', requireRole('teacher'), uploadThumbnail.single('cover'), adminBookController.update);
 router.post('/sach/:id/xoa', requireRole('admin'), adminBookController.delete);
 
+router.get('/sach/:id/chuong', requireRole('teacher'), adminBookController.chapters);
+router.get('/sach/:id/chuong/nhap-tu-file', requireRole('teacher'), adminBookController.chapterImportForm);
+router.post('/sach/:id/chuong/nhap-tu-file', requireRole('teacher'), (req, res, next) => {
+  uploadExamDoc.single('exam_file')(req, res, (err) => {
+    if (err) {
+      console.error('Loi upload file sach:', err);
+      return res.status(400).send(
+        `<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">Lỗi khi tải file lên: ${err.message}</pre>`
+      );
+    }
+    next();
+  });
+}, adminBookController.chapterImport);
+router.post('/sach-chuong/nhap-tu-file/luu', requireRole('teacher'), adminBookController.chapterImportSave);
+router.post('/sach-chuong', requireRole('teacher'), adminBookController.chapterCreate);
+router.get('/sach-chuong/:id/sua', requireRole('teacher'), adminBookController.chapterEditForm);
+router.post('/sach-chuong/sap-xep', requireRole('teacher'), adminBookController.chapterReorder);
+router.post('/sach-chuong/:id', requireRole('teacher'), adminBookController.chapterUpdate);
+router.post('/sach-chuong/:id/xoa', requireRole('teacher'), adminBookController.chapterDelete);
+
 // ---- Noi dung khoa hoc: Chuong > Bai > Video/File ----
 router.get('/khoa-hoc/:id/noi-dung', courseController.contentPage);
 
 router.post('/chuong', requireRole('teacher'), contentController.createChapter);
+router.post('/chuong/sap-xep', requireRole('teacher'), contentController.reorderChapters);
 router.post('/chuong/:id', requireRole('teacher'), contentController.updateChapter);
 router.post('/chuong/:id/xoa', requireRole('teacher'), contentController.deleteChapter);
-router.post('/chuong/sap-xep', requireRole('teacher'), contentController.reorderChapters);
 
 router.post('/bai-hoc', requireRole('teacher'), contentController.createLesson);
+router.post('/bai-hoc/sap-xep', requireRole('teacher'), contentController.reorderLessons);
 router.post('/bai-hoc/:id', requireRole('teacher'), contentController.updateLesson);
 router.post('/bai-hoc/:id/xoa', requireRole('teacher'), contentController.deleteLesson);
-router.post('/bai-hoc/sap-xep', requireRole('teacher'), contentController.reorderLessons);
 
 router.post('/video', requireRole('teacher'), uploadVideo.single('video_file'), contentController.createVideo);
 router.post('/video/:id/xoa', requireRole('teacher'), contentController.deleteVideo);
@@ -89,9 +117,25 @@ router.post('/cau-hoi/:id/xoa', requireRole('teacher'), adminQuizController.dele
 router.get('/bai-kiem-tra/:quizId/ket-qua', requireRole('ta'), adminQuizController.results);
 router.post('/bai-kiem-tra/cham-tay', requireRole('teacher'), adminQuizController.gradeManual);
 
-// ---- Upload de thi tu file Word/PDF (tu dong nhan dien + xem truoc de sua) ----
-router.get('/bai-hoc/:lessonId/bai-kiem-tra/tai-de', requireRole('teacher'), adminExamImportController.uploadForm);
-router.post('/bai-hoc/:lessonId/bai-kiem-tra/tai-de', requireRole('teacher'), uploadExamDoc.single('exam_file'), adminExamImportController.upload);
+// ---- Thuc chien phong thi (de thi doc lap, khong gan voi khoa hoc nao) ----
+router.get('/phong-thi', requireRole('teacher'), adminQuizController.examRoomList);
+router.get('/phong-thi/them-moi', requireRole('teacher'), adminQuizController.examRoomNewForm);
+router.post('/phong-thi', requireRole('teacher'), adminQuizController.examRoomCreate);
+router.get('/bai-kiem-tra/:quizId/cau-hoi', requireRole('teacher'), adminQuizController.manageStandalone);
+
+// ---- Upload de thi tu file Word/PDF hoac link Google Drive (tu dong nhan dien + xem truoc de sua) ----
+router.get('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), adminExamImportController.uploadForm);
+router.post('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), (req, res, next) => {
+  uploadExamDoc.single('exam_file')(req, res, (err) => {
+    if (err) {
+      console.error('Loi upload file de thi:', err);
+      return res.status(400).send(
+        `<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">Lỗi khi tải file lên: ${err.message}</pre>`
+      );
+    }
+    next();
+  });
+}, adminExamImportController.upload);
 router.post('/bai-kiem-tra/luu-de-import', requireRole('teacher'), adminExamImportController.save);
 
 // ---- 4. Hoc vien ----
@@ -113,6 +157,8 @@ router.post('/don-hang/:order_id/xac-nhan', requireRole('admin'), checkoutContro
 router.get('/ma-kich-hoat', requireRole('ta'), miscController.activationCodes);
 router.post('/ma-kich-hoat', requireRole('teacher'), miscController.generateActivationCodes);
 router.post('/ma-kich-hoat/:id/xoa', requireRole('teacher'), miscController.deleteActivationCode);
+router.post('/ma-kich-hoat/:id/vo-hieu-hoa', requireRole('teacher'), miscController.deactivateActivationCode);
+router.post('/ma-kich-hoat/:id/kich-hoat-lai', requireRole('teacher'), miscController.reactivateActivationCode);
 
 // ---- Banner ----
 router.get('/banner', requireRole('admin'), miscController.banners);

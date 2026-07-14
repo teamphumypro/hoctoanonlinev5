@@ -1,12 +1,13 @@
 const Cart = require('../models/Cart');
 const Order = require('../models/Order');
 const Settings = require('../models/Settings');
+const User = require('../models/User');
 const vnpay = require('../services/payment/vnpay');
 const momo = require('../services/payment/momo');
 const zalopay = require('../services/payment/zalopay');
 const bankTransfer = require('../services/payment/bankTransfer');
 
-// Trang thanh toan: hien toan bo gio hang hien tai + chon phuong thuc
+// Trang thanh toan: hien toan bo gio hang hien tai + chon phuong thuc + thong tin khach hang
 exports.checkoutForm = async (req, res) => {
   const items = await Cart.listWithDetails(req.session.user.id);
   if (items.length === 0) return res.redirect('/gio-hang');
@@ -20,7 +21,8 @@ exports.checkoutForm = async (req, res) => {
     bank_transfer: bankTransfer.isConfigured(config),
     cod: true
   };
-  res.render('checkout', { items, total, qrUrl: null, order: null, methods });
+  const customer = await User.findById(req.session.user.id);
+  res.render('checkout', { items, total, qrUrl: null, order: null, methods, customer });
 };
 
 exports.createOrder = async (req, res) => {
@@ -28,30 +30,44 @@ exports.createOrder = async (req, res) => {
   if (items.length === 0) return res.redirect('/gio-hang');
   const total = items.reduce((sum, i) => sum + Number(i.price), 0);
 
-  const { payment_method, recipient_name, recipient_phone, recipient_address } = req.body;
+  const { payment_method, recipient_name, recipient_phone, recipient_address, recipient_birth_year } = req.body;
   const config = await Settings.getAll();
+  const customer = await User.findById(req.session.user.id);
+
+  // Bat buoc thu thap du thong tin khach hang cho MOI phuong thuc thanh toan (khong rieng COD),
+  // de xay dung du lieu khach hang day du trong Admin
+  if (!recipient_name || !recipient_phone || !recipient_address) {
+    const methods = {
+      vnpay: vnpay.isConfigured(config), momo: momo.isConfigured(config),
+      zalopay: zalopay.isConfigured(config), bank_transfer: bankTransfer.isConfigured(config), cod: true
+    };
+    return res.render('checkout', {
+      items, total, qrUrl: null, order: null, methods, customer,
+      notice: 'Vui lòng nhập đầy đủ họ tên, số điện thoại và địa chỉ trước khi thanh toán.'
+    });
+  }
+
+  // Luu lai vao ho so khach hang de lan sau khong phai nhap lai, va de Admin xem duoc thong tin day du
+  await User.updateCustomerInfo(req.session.user.id, {
+    name: recipient_name, phone: recipient_phone,
+    birth_year: recipient_birth_year, address: recipient_address
+  });
+  req.session.user.name = recipient_name;
 
   if (payment_method === 'cod') {
-    if (!recipient_name || !recipient_phone || !recipient_address) {
-      const methods = {
-        vnpay: vnpay.isConfigured(config), momo: momo.isConfigured(config),
-        zalopay: zalopay.isConfigured(config), bank_transfer: bankTransfer.isConfigured(config), cod: true
-      };
-      return res.render('checkout', {
-        items, total, qrUrl: null, order: null, methods,
-        notice: 'Vui lòng nhập đầy đủ tên người nhận, số điện thoại và địa chỉ để đặt hàng COD.'
-      });
-    }
     const order = await Order.createWithItems({
       user_id: req.session.user.id, items, amount: total, payment_method: 'cod',
-      recipient_name, recipient_phone, recipient_address
+      recipient_name, recipient_phone, recipient_address, recipient_birth_year
     });
     await Cart.clear(req.session.user.id);
     return res.render('checkout', { items, total, qrUrl: null, order, methods: {}, codConfirmed: true });
   }
 
   if (payment_method === 'bank_transfer') {
-    const order = await Order.createWithItems({ user_id: req.session.user.id, items, amount: total, payment_method: 'bank_transfer' });
+    const order = await Order.createWithItems({
+      user_id: req.session.user.id, items, amount: total, payment_method: 'bank_transfer',
+      recipient_name, recipient_phone, recipient_address, recipient_birth_year
+    });
     await Cart.clear(req.session.user.id);
     return res.render('checkout', {
       items, total, qrUrl: `/thanh-toan/qr-anh/${order.id}`, order, methods: {},
@@ -60,7 +76,10 @@ exports.createOrder = async (req, res) => {
   }
 
   if (payment_method === 'vnpay' && vnpay.isConfigured(config)) {
-    const order = await Order.createWithItems({ user_id: req.session.user.id, items, amount: total, payment_method: 'vnpay' });
+    const order = await Order.createWithItems({
+      user_id: req.session.user.id, items, amount: total, payment_method: 'vnpay',
+      recipient_name, recipient_phone, recipient_address, recipient_birth_year
+    });
     const paymentUrl = vnpay.createPaymentUrl({
       orderId: String(order.id), amount: total, orderDescription: `Thanh toan don hang #${order.id}`,
       ipAddr: req.ip, returnUrl: `${req.protocol}://${req.get('host')}/thanh-toan/vnpay/tra-ve`, config
@@ -70,7 +89,10 @@ exports.createOrder = async (req, res) => {
   }
 
   if (payment_method === 'momo' && momo.isConfigured(config)) {
-    const order = await Order.createWithItems({ user_id: req.session.user.id, items, amount: total, payment_method: 'momo' });
+    const order = await Order.createWithItems({
+      user_id: req.session.user.id, items, amount: total, payment_method: 'momo',
+      recipient_name, recipient_phone, recipient_address, recipient_birth_year
+    });
     const payUrl = await momo.createPaymentUrl({
       orderId: String(order.id), amount: total, orderInfo: `Thanh toan don hang #${order.id}`,
       returnUrl: `${req.protocol}://${req.get('host')}/thanh-toan/vnpay/tra-ve`,
@@ -81,7 +103,10 @@ exports.createOrder = async (req, res) => {
   }
 
   if (payment_method === 'zalopay' && zalopay.isConfigured(config)) {
-    const order = await Order.createWithItems({ user_id: req.session.user.id, items, amount: total, payment_method: 'zalopay' });
+    const order = await Order.createWithItems({
+      user_id: req.session.user.id, items, amount: total, payment_method: 'zalopay',
+      recipient_name, recipient_phone, recipient_address, recipient_birth_year
+    });
     const result = await zalopay.createOrder({
       orderId: String(order.id), amount: total, description: `Thanh toan don hang #${order.id}`,
       redirectUrl: `${req.protocol}://${req.get('host')}/thanh-toan/vnpay/tra-ve`, config
@@ -91,7 +116,7 @@ exports.createOrder = async (req, res) => {
 
   const methods = { vnpay: vnpay.isConfigured(config), momo: momo.isConfigured(config), zalopay: zalopay.isConfigured(config), bank_transfer: bankTransfer.isConfigured(config), cod: true };
   return res.render('checkout', {
-    items, total, qrUrl: null, order: null, methods,
+    items, total, qrUrl: null, order: null, methods, customer,
     notice: 'Phương thức này chưa được quản trị viên cấu hình. Vui lòng vào Admin > Cài đặt thanh toán để nhập thông tin merchant.'
   });
 };

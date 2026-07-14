@@ -1,0 +1,62 @@
+<% var pageTitle = 'Đọc: ' + book.title %>
+<%- include('partials/header') %>
+
+<div class="text-center mb-3">
+  <h5 class="fw-bold mb-0"><%= book.title %></h5>
+  <div class="small text-muted">Bấm vào mép trang hoặc dùng nút để lật trang</div>
+</div>
+
+<div class="d-flex justify-content-center mb-3">
+  <div id="flipbook"></div>
+</div>
+
+<div class="d-flex justify-content-center gap-2 mb-4">
+  <button id="prevBtn" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Trang trước</button>
+  <button id="nextBtn" class="btn btn-outline-secondary btn-sm">Trang sau <i class="fa-solid fa-arrow-right"></i></button>
+</div>
+
+<div id="pageSource" class="d-none">
+  <% chapters.forEach((c, i) => { %>
+    <div class="storypage" data-density="hard">
+      <div class="storypage-inner">
+        <h6 class="fw-bold mb-2">Chương <%= i+1 %>: <%= c.title %></h6>
+        <% if (c.unlocked) { %>
+          <div class="storypage-content"><%- c.content %></div>
+        <% } else { %>
+          <div class="text-center py-5">
+            <i class="fa-solid fa-lock fa-2x text-muted mb-3"></i>
+            <p class="text-muted">Chương này cần mua sách mới đọc được.</p>
+            <a href="/sach/<%= book.slug %>" class="btn btn-primary btn-sm">Xem thông tin mua sách</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<style>
+  #flipbook{ box-shadow:0 10px 30px rgba(0,0,0,.2); }
+  .storypage{ background:#fdfaf3; width:100%; height:100%; overflow:hidden; }
+  .storypage-inner{ padding:24px; height:100%; overflow-y:auto; font-size:.95rem; line-height:1.7; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+<script>
+  const pageEls = document.querySelectorAll('#pageSource .storypage');
+  const flipbookEl = document.getElementById('flipbook');
+  const isMobile = window.innerWidth < 700;
+  const pageFlip = new St.PageFlip(flipbookEl, {
+    width: isMobile ? 320 : 420,
+    height: isMobile ? 460 : 600,
+    size: 'stretch',
+    minWidth: 280, maxWidth: 600, minHeight: 400, maxHeight: 820,
+    showCover: true,
+    maxShadowOpacity: 0.5
+  });
+  pageFlip.loadFromHTML(pageEls);
+
+  document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
+  document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
+</script>
+
+<%- include('partials/footer') %>

@@ -354,9 +354,63 @@ BEGIN
     CHECK (payment_method IN ('vnpay','momo','zalopay','bank_transfer','activation_code','cod'));
 END $$;
 
+-- ---------- BO SUNG: dang nhap bang SDT + thu thap thong tin khach hang day du ----------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_phone_key') THEN
+    ALTER TABLE users ADD CONSTRAINT users_phone_key UNIQUE (phone);
+  END IF;
+END $$;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_birth_year INTEGER;
+
+-- ---------- BO SUNG: "Thuc chien phong thi" - de thi doc lap khong gan voi bai hoc nao ----------
+ALTER TABLE quizzes ALTER COLUMN lesson_id DROP NOT NULL;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_standalone INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+
+-- ---------- BO SUNG: vong doi ma kich hoat (han dung, vo hieu hoa thu cong) ----------
+ALTER TABLE activation_codes ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE activation_codes ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1;
+
+-- ---------- BO SUNG: doc sach online kieu "sach lat" theo chuong, gop chung voi Sach (khong tach rieng Truyen nua) ----------
+CREATE TABLE IF NOT EXISTS book_chapters (
+  id SERIAL PRIMARY KEY,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT,
+  is_free INTEGER NOT NULL DEFAULT 0, -- doc mien phi du sach dang tra phi (vd doc thu vai chuong dau)
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- ---------- BO SUNG: doc thu sach + phan loai sach (dat cuoi file vi can bang books da ton tai) ----------
 ALTER TABLE books ADD COLUMN IF NOT EXISTS preview_url TEXT; -- link PDF doc thu (Google Drive...)
-ALTER TABLE books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL; -- dung chung he thong Lop/Mon voi Khoa hoc
+
+-- Danh muc rieng cho Sach, TACH BIET hoan toan voi danh muc Khoa hoc (categories)
+CREATE TABLE IF NOT EXISTS book_categories (
+  id SERIAL PRIMARY KEY,
+  parent_id INTEGER REFERENCES book_categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Chuyen books.category_id sang tro toi book_categories (truoc do dang tro nham qua categories cua Khoa hoc)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='books' AND column_name='category_id') THEN
+    ALTER TABLE books DROP CONSTRAINT IF EXISTS books_category_id_fkey;
+    UPDATE books SET category_id = NULL; -- gia tri cu tham chieu sai bang, dat lai ve rong cho an toan
+  ELSE
+    ALTER TABLE books ADD COLUMN category_id INTEGER;
+  END IF;
+  ALTER TABLE books ADD CONSTRAINT books_category_id_fkey FOREIGN KEY (category_id) REFERENCES book_categories(id) ON DELETE SET NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS book_types (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

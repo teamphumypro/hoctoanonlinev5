@@ -51,6 +51,16 @@
         </div>
       <% } else if (methods && (methods.vnpay || methods.momo || methods.zalopay || methods.bank_transfer || methods.cod)) { %>
         <form method="POST" action="/thanh-toan" id="checkoutForm">
+          <div class="border rounded p-3 mb-3">
+            <p class="fw-semibold small mb-2">Thông tin khách hàng</p>
+            <div class="mb-2"><input name="recipient_name" class="form-control" placeholder="Họ và tên" value="<%= typeof customer !== 'undefined' && customer ? customer.name : '' %>" required></div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-6"><input name="recipient_phone" class="form-control" placeholder="Số điện thoại" value="<%= typeof customer !== 'undefined' && customer && customer.phone ? customer.phone : '' %>" required></div>
+              <div class="col-md-6"><input type="number" name="recipient_birth_year" class="form-control" placeholder="Năm sinh" min="1930" max="2020" value="<%= typeof customer !== 'undefined' && customer && customer.birth_year ? customer.birth_year : '' %>"></div>
+            </div>
+            <textarea name="recipient_address" class="form-control" rows="2" placeholder="Địa chỉ" required><%= typeof customer !== 'undefined' && customer && customer.address ? customer.address : '' %></textarea>
+          </div>
+
           <label class="form-label fw-semibold">Chọn phương thức thanh toán</label>
           <div class="list-group mb-3">
             <% if (methods.vnpay) { %><label class="list-group-item"><input class="form-check-input me-2 pm-radio" type="radio" name="payment_method" value="vnpay" checked> VNPay</label><% } %>
@@ -60,30 +70,8 @@
             <% if (methods.cod) { %><label class="list-group-item"><input class="form-check-input me-2 pm-radio" type="radio" name="payment_method" value="cod" id="pmCod" <%= (!methods.vnpay && !methods.momo && !methods.zalopay && !methods.bank_transfer)?'checked':'' %>> Thanh toán khi nhận hàng (COD)</label><% } %>
           </div>
 
-          <% if (methods.cod) { %>
-          <div id="codFields" class="border rounded p-3 mb-3 d-none">
-            <p class="small text-muted mb-2">Nhập thông tin để nhận hàng/kích hoạt khóa học:</p>
-            <div class="mb-2"><input name="recipient_name" class="form-control" placeholder="Họ tên người nhận"></div>
-            <div class="mb-2"><input name="recipient_phone" class="form-control" placeholder="Số điện thoại"></div>
-            <div class="mb-2"><textarea name="recipient_address" class="form-control" rows="2" placeholder="Địa chỉ nhận hàng"></textarea></div>
-          </div>
-          <% } %>
-
           <button class="btn btn-primary w-100">Thanh toán</button>
         </form>
-        <script>
-          const codFields = document.getElementById('codFields');
-          if (codFields) {
-            document.querySelectorAll('.pm-radio').forEach(r => {
-              r.addEventListener('change', () => {
-                codFields.classList.toggle('d-none', r.value !== 'cod' || !r.checked);
-              });
-            });
-            if (document.getElementById('pmCod') && document.getElementById('pmCod').checked) {
-              codFields.classList.remove('d-none');
-            }
-          }
-        </script>
       <% } else if (!(typeof notice !== 'undefined' && notice)) { %>
         <div class="alert alert-warning small mb-0">
           Chưa có phương thức thanh toán nào được cấu hình. Quản trị viên vào <strong>Admin → Cài đặt thanh toán</strong> để thiết lập (chuyển khoản QR chỉ cần nhập số tài khoản ngân hàng là dùng được ngay, không cần đăng ký gì thêm).

@@ -1,13 +1,17 @@
-<% var pageTitle = 'Bài kiểm tra: ' + lesson.title %>
+<% var pageTitle = quiz ? 'Bài kiểm tra: ' + quiz.title : (lesson ? 'Bài kiểm tra: ' + lesson.title : 'Đề thi mới') %>
 <%- include('../../partials/admin-header') %>
+
+<% if (typeof backLink !== 'undefined' && backLink) { %>
+  <div class="mb-3"><a href="<%= backLink %>" class="btn btn-outline-secondary btn-sm">← Quay lại</a></div>
+<% } %>
 
 <% if (!quiz) { %>
   <div class="card p-4" style="max-width:500px">
-    <h6 class="fw-bold mb-3">Tạo bài kiểm tra cho bài học này</h6>
+    <h6 class="fw-bold mb-3">Tạo bài kiểm tra<%= lesson ? ' cho bài học này' : '' %></h6>
     <form method="POST" action="/admin/bai-kiem-tra">
-      <input type="hidden" name="lesson_id" value="<%= lesson.id %>">
+      <% if (lesson) { %><input type="hidden" name="lesson_id" value="<%= lesson.id %>"><% } %>
       <div class="mb-3"><label class="form-label">Tên bài kiểm tra</label>
-        <input name="title" class="form-control" value="Bài kiểm tra: <%= lesson.title %>" required></div>
+        <input name="title" class="form-control" value="<%= lesson ? 'Bài kiểm tra: ' + lesson.title : '' %>" required></div>
       <div class="mb-3"><label class="form-label">Điểm tối thiểu để đạt (thang điểm tổng của cả bài)</label>
         <input type="number" step="0.1" name="pass_score" class="form-control" value="5" min="0"></div>
       <button class="btn btn-primary">Tạo bài kiểm tra</button>
@@ -20,10 +24,10 @@
       <div class="small text-muted">Tổng điểm: <%= totalPoints %> — Cần đạt tối thiểu <%= quiz.pass_score %> điểm</div>
     </div>
     <div>
-      <a href="/admin/bai-hoc/<%= lesson.id %>/bai-kiem-tra/tai-de" class="btn btn-sm btn-outline-success">📄 Tải đề từ file Word/PDF</a>
+      <a href="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" class="btn btn-sm btn-outline-success">📄 Tải đề từ file/link</a>
       <a href="/admin/bai-kiem-tra/<%= quiz.id %>/ket-qua" class="btn btn-sm btn-outline-primary">Xem bảng điểm</a>
       <form method="POST" action="/admin/bai-kiem-tra/<%= quiz.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa cả bài kiểm tra và toàn bộ câu hỏi?')">
-        <input type="hidden" name="lesson_id" value="<%= lesson.id %>">
+        <% if (lesson) { %><input type="hidden" name="lesson_id" value="<%= lesson.id %>"><% } %>
         <button class="btn btn-sm btn-outline-danger">Xóa bài kiểm tra</button>
       </form>
     </div>
@@ -33,7 +37,6 @@
     <h6 class="fw-bold mb-2">Thêm câu hỏi mới</h6>
     <form method="POST" action="/admin/bai-kiem-tra/cau-hoi" id="addQuestionForm">
       <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
-      <input type="hidden" name="lesson_id" value="<%= lesson.id %>">
 
       <div class="row g-2 mb-2">
         <div class="col-md-8">
@@ -53,20 +56,18 @@
 
       <div class="mb-2"><textarea name="question" class="form-control" rows="2" placeholder="Nội dung câu hỏi / đề bài" required></textarea></div>
 
-      <!-- Dang: Trac nghiem 1 dap an -->
       <div id="fieldsSingleChoice">
         <div class="row g-2 mb-2">
           <% for (let i = 0; i < 4; i++) { %>
             <div class="col-md-6 d-flex align-items-center gap-2">
               <input type="radio" name="correct_index" value="<%= i %>" <%= i===0?'checked':'' %> title="Đáp án đúng">
-              <input name="options[]" class="form-control" placeholder="Phương án <%= String.fromCharCode(65+i) %>" <%= i<2?'':'' %>>
+              <input name="options[]" class="form-control" placeholder="Phương án <%= String.fromCharCode(65+i) %>">
             </div>
           <% } %>
         </div>
         <div class="form-text">Tick vào nút tròn ở phương án đúng. Điểm mặc định theo quy chế: 0.25đ/câu.</div>
       </div>
 
-      <!-- Dang: Dung/Sai nhieu y -->
       <div id="fieldsTrueFalse" class="d-none">
         <p class="small text-muted mb-1">Nhập 4 ý (a, b, c, d), tick "Đúng" cho các ý đúng:</p>
         <% ['a','b','c','d'].forEach((letter, i) => { %>
@@ -79,13 +80,11 @@
         <div class="form-text">Thang điểm chính thức: đúng 1 ý = 0.1đ, 2 ý = 0.25đ, 3 ý = 0.5đ, cả 4 ý = điểm tối đa của câu (thường 1đ).</div>
       </div>
 
-      <!-- Dang: Tra loi ngan -->
       <div id="fieldsShortAnswer" class="d-none">
         <input name="correct_answer" class="form-control" placeholder="Đáp án đúng (học viên phải gõ khớp, không phân biệt hoa thường)">
         <div class="form-text">Điểm mặc định theo quy chế: môn Toán 0.5đ/câu, các môn khác 0.25đ/câu.</div>
       </div>
 
-      <!-- Dang: Tu luan -->
       <div id="fieldsEssay" class="d-none">
         <div class="form-text">Học viên sẽ nhập bài làm dạng văn bản dài (Đọc hiểu / Nghị luận xã hội / Nghị luận văn học...). Bạn cần vào "Bảng điểm" để chấm tay và cho điểm sau khi học viên nộp bài.</div>
       </div>
@@ -108,7 +107,8 @@
             <span class="text-muted small">(<%= q.points %>đ)</span>: <%= q.question %>
           </strong>
           <form method="POST" action="/admin/cau-hoi/<%= q.id %>/xoa" onsubmit="return confirm('Xóa câu hỏi này?')">
-            <input type="hidden" name="lesson_id" value="<%= lesson.id %>">
+            <% if (lesson) { %><input type="hidden" name="lesson_id" value="<%= lesson.id %>"><% } %>
+            <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
             <button class="btn btn-sm btn-link text-danger p-0">Xóa</button>
           </form>
         </div>

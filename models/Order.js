@@ -19,11 +19,11 @@ const Order = {
   },
 
   // Don hang moi: nhieu san pham (khoa hoc + sach) trong 1 don, dung cho luong gio hang
-  async createWithItems({ user_id, items, amount, payment_method, status = 'pending', recipient_name = null, recipient_phone = null, recipient_address = null }) {
+  async createWithItems({ user_id, items, amount, payment_method, status = 'pending', recipient_name = null, recipient_phone = null, recipient_address = null, recipient_birth_year = null }) {
     const r = await db.query(
-      `INSERT INTO orders (user_id,course_id,amount,payment_method,status,recipient_name,recipient_phone,recipient_address)
-       VALUES ($1,NULL,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [user_id, amount, payment_method, status, recipient_name, recipient_phone, recipient_address]
+      `INSERT INTO orders (user_id,course_id,amount,payment_method,status,recipient_name,recipient_phone,recipient_address,recipient_birth_year)
+       VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [user_id, amount, payment_method, status, recipient_name, recipient_phone, recipient_address, recipient_birth_year || null]
     );
     const order = r.rows[0];
     for (const item of items) {

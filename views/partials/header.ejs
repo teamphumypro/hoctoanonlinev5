@@ -21,10 +21,6 @@
         <% navItems.forEach(item => { %>
           <li class="nav-item"><a class="nav-link" href="<%= item.url %>"><%= item.label %></a></li>
         <% }) %>
-        <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-          <li class="nav-item"><a class="nav-link" href="/cong-dong">Cộng đồng</a></li>
-          <li class="nav-item"><a class="nav-link" href="/kich-hoat">Nhập mã kích hoạt</a></li>
-        <% } %>
       </ul>
       <ul class="navbar-nav align-items-lg-center">
         <% if (typeof currentUser !== 'undefined' && currentUser) { %>
@@ -38,6 +34,8 @@
               <li><a class="dropdown-item" href="/tai-khoan">Khóa học của tôi</a></li>
               <li><a class="dropdown-item" href="/tai-khoan/tu-sach">Tủ sách của tôi</a></li>
               <li><a class="dropdown-item" href="/tai-khoan/chung-chi">Chứng chỉ</a></li>
+              <li><a class="dropdown-item" href="/cong-dong">Cộng đồng</a></li>
+              <li><a class="dropdown-item" href="/kich-hoat">Nhập mã kích hoạt</a></li>
               <li><a class="dropdown-item" href="/tai-khoan/doi-mat-khau">Đổi mật khẩu</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="/dang-xuat">Đăng xuất</a></li>

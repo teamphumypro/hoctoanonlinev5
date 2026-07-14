@@ -41,14 +41,14 @@ exports.courseDetail = async (req, res) => {
 exports.allBooks = async (req, res) => {
   const Book = require('../models/Book');
   const BookType = require('../models/BookType');
-  const Category = require('../models/Category');
+  const BookCategory = require('../models/BookCategory');
 
-  const categories = await Category.tree();
+  const categories = await BookCategory.tree();
   const bookTypes = await BookType.all();
 
   let category_id = null, book_type_id = null;
   if (req.query.danh_muc) {
-    const cat = await Category.findBySlug(req.query.danh_muc);
+    const cat = await BookCategory.findBySlug(req.query.danh_muc);
     if (cat) category_id = cat.id;
   }
   if (req.query.the_loai) {
@@ -67,7 +67,37 @@ exports.bookDetail = async (req, res) => {
   if (!book) return res.status(404).render('404');
   let purchased = false;
   if (req.session.user) purchased = await BookPurchase.isPurchased(req.session.user.id, book.id);
-  res.render('book-detail', { book, purchased });
+  const BookChapter = require('../models/BookChapter');
+  const chapters = await BookChapter.byBook(book.id);
+  res.render('book-detail', { book, purchased, chapters });
+};
+
+// Trang doc sach online kieu "sach lat": tai toan bo chuong vao 1 cuon sach lat,
+// chuong chua duoc mo khoa (chua mua & khong phai chuong doc thu) se hien trang khoa thay vi noi dung that
+exports.bookRead = async (req, res) => {
+  const Book = require('../models/Book');
+  const BookPurchase = require('../models/BookPurchase');
+  const BookChapter = require('../models/BookChapter');
+  const book = await Book.findBySlug(req.params.slug);
+  if (!book) return res.status(404).render('404');
+  const chapters = await BookChapter.byBook(book.id);
+  if (chapters.length === 0) return res.redirect(`/sach/${book.slug}`);
+
+  let purchased = false;
+  if (req.session.user) purchased = await BookPurchase.isPurchased(req.session.user.id, book.id);
+
+  const unlockedChapters = chapters.map(c => ({
+    ...c,
+    unlocked: book.price === 0 || c.is_free === 1 || purchased
+  }));
+
+  res.render('book-read', { book, chapters: unlockedChapters, purchased });
+};
+
+exports.onlineReadingBooks = async (req, res) => {
+  const Book = require('../models/Book');
+  const books = await Book.withChaptersPublished();
+  res.render('online-reading-books', { books });
 };
 
 exports.newsList = async (req, res) => {

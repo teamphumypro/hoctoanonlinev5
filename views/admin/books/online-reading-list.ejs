@@ -1,0 +1,30 @@
+<% var pageTitle = 'Đọc sách online' %>
+<%- include('../../partials/admin-header') %>
+<div class="alert alert-secondary small">
+  Đây là danh sách các sách đã bật chương đọc online (kiểu lật trang). Sách bán/tải file vẫn quản lý chung ở mục "Sách" — mục này chỉ để bạn thao tác nhanh với phần đọc online mà không cần lọc qua danh sách sách đầy đủ.
+</div>
+<div class="card p-3">
+  <table class="table">
+    <thead><tr><th>Ảnh</th><th>Tên sách</th><th>Số chương</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody>
+      <% books.forEach(b => { %>
+        <tr>
+          <td><img src="<%= b.cover_url || '/img/placeholder.svg' %>" width="45" height="60" style="object-fit:cover;border-radius:4px"></td>
+          <td><%= b.title %></td>
+          <td><%= b.chapter_count %> chương</td>
+          <td><span class="badge bg-<%= b.is_published ? 'success' : 'secondary' %>"><%= b.is_published ? 'Hiển thị' : 'Ẩn' %></span></td>
+          <td class="text-nowrap">
+            <a href="/admin/sach/<%= b.id %>/chuong" class="btn btn-sm btn-outline-primary">Quản lý chương</a>
+            <a href="/sach/<%= b.slug %>/doc" target="_blank" class="btn btn-sm btn-outline-secondary">Xem thử</a>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (books.length === 0) { %>
+        <tr><td colspan="5" class="text-center text-muted">
+          Chưa có sách nào bật đọc online. Vào <a href="/admin/sach">Sách</a> → chọn 1 cuốn → bấm "Chương" để thêm chương đầu tiên.
+        </td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+<%- include('../../partials/admin-footer') %>

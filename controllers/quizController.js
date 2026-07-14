@@ -7,8 +7,11 @@ exports.take = async (req, res) => {
   const quiz = await Quiz.findById(req.params.id);
   if (!quiz) return res.status(404).render('404');
 
-  const enrolled = await Enrollment.isEnrolled(req.session.user.id, quiz.course_id);
-  if (!enrolled) return res.status(403).render('403', { user: req.session.user });
+  if (quiz.lesson_id) {
+    const enrolled = await Enrollment.isEnrolled(req.session.user.id, quiz.course_id);
+    if (!enrolled) return res.status(403).render('403', { user: req.session.user });
+  }
+  // De thi doc lap (Thuc chien phong thi): chi can dang nhap la lam duoc, khong can ghi danh khoa hoc nao
 
   const questions = await Quiz.fullQuestions(quiz.id);
   const bestAttempt = await Quiz.bestAttempt(quiz.id, req.session.user.id);
@@ -21,8 +24,10 @@ exports.submit = async (req, res) => {
   const quiz = await Quiz.findById(req.params.id);
   if (!quiz) return res.status(404).render('404');
 
-  const enrolled = await Enrollment.isEnrolled(req.session.user.id, quiz.course_id);
-  if (!enrolled) return res.status(403).render('403', { user: req.session.user });
+  if (quiz.lesson_id) {
+    const enrolled = await Enrollment.isEnrolled(req.session.user.id, quiz.course_id);
+    if (!enrolled) return res.status(403).render('403', { user: req.session.user });
+  }
 
   // Dung nap du lieu tu form: cau trac nghiem/tra loi ngan gui answers[qid],
   // cau dung-sai gui answers_tf[qid][itemId], cau tu luan gui essay[qid]

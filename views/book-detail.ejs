@@ -20,6 +20,9 @@
           <div class="text-muted text-decoration-line-through"><%= formatVND(book.compare_at_price) %></div>
         <% } %>
       </div>
+      <% if (chapters && chapters.length > 0) { %>
+        <a href="/sach/<%= book.slug %>/doc" class="btn btn-primary w-100 mb-2"><i class="fa-solid fa-book-open"></i> Đọc online (kiểu lật trang)</a>
+      <% } %>
       <% if (purchased) { %>
         <a href="<%= book.file_url %>" target="_blank" class="btn btn-success w-100 mb-2">Tải sách ngay</a>
       <% } else { %>

@@ -86,6 +86,12 @@ app.use(async (req, res, next) => {
     };
     res.locals.navItems = navItems;
     res.locals.activePopup = popup || null;
+
+    // Neu request den tu 1 ten mien phu da cau hinh, tu dong mo thang vao trang duoc chi dinh
+    const customDomain = (all.custom_domain || '').trim().toLowerCase();
+    if (customDomain && req.hostname && req.hostname.toLowerCase() === customDomain && req.path === '/') {
+      return res.redirect(all.custom_domain_path || '/truyen');
+    }
   } catch (e) {
     res.locals.site = {
       site_name_1: 'Học', site_name_2: 'Online',
@@ -109,7 +115,17 @@ app.use((req, res) => res.status(404).render('404'));
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).send('Đã xảy ra lỗi máy chủ. Vui lòng thử lại sau.');
+  // Hien chi tiet loi that ra man hinh (thay vi chi noi chung chung) de de debug nhanh
+  // ma khong can vao Render Logs moi lan. Chap nhan duoc vi day la du an dang phat trien,
+  // chi co admin duy nhat truy cap.
+  res.status(500).send(
+    `<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">` +
+    `Đã xảy ra lỗi máy chủ.\n\n` +
+    `Trang: ${req.method} ${req.originalUrl}\n` +
+    `Lỗi: ${err.message}\n\n` +
+    `Chi tiết kỹ thuật:\n${err.stack || ''}` +
+    `</pre>`
+  );
 });
 
 app.listen(PORT, () => {

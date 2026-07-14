@@ -7,17 +7,40 @@ const Quiz = {
   },
   async findById(id) {
     const r = await db.query(`
-      SELECT q.*, l.title AS lesson_title, ch.course_id
-      FROM quizzes q JOIN lessons l ON l.id=q.lesson_id JOIN chapters ch ON ch.id=l.chapter_id
+      SELECT q.*, l.title AS lesson_title, ch.course_id, cat.name AS category_name
+      FROM quizzes q
+      LEFT JOIN lessons l ON l.id=q.lesson_id
+      LEFT JOIN chapters ch ON ch.id=l.chapter_id
+      LEFT JOIN categories cat ON cat.id = q.category_id
       WHERE q.id=$1`, [id]);
     return r.rows[0];
   },
-  async create({ lesson_id, title, pass_score }) {
+  async create({ lesson_id, title, pass_score, category_id, is_standalone }) {
     const r = await db.query(
-      `INSERT INTO quizzes (lesson_id, title, pass_score) VALUES ($1,$2,$3) RETURNING *`,
-      [lesson_id, title, pass_score || 5]
+      `INSERT INTO quizzes (lesson_id, title, pass_score, category_id, is_standalone) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [lesson_id || null, title, pass_score || 5, category_id || null, is_standalone ? 1 : 0]
     );
     return r.rows[0];
+  },
+  // Danh sach de thi doc lap (Thuc chien phong thi), khong gan voi bai hoc nao
+  async standaloneAll() {
+    const r = await db.query(`
+      SELECT q.*, cat.name AS category_name,
+        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id=q.id) AS question_count
+      FROM quizzes q LEFT JOIN categories cat ON cat.id = q.category_id
+      WHERE q.is_standalone=1 ORDER BY q.created_at DESC`);
+    return r.rows;
+  },
+  async standalonePublished(category_id) {
+    const params = [];
+    let where = 'q.is_standalone=1';
+    if (category_id) { params.push(category_id); where += ` AND q.category_id=$${params.length}`; }
+    const r = await db.query(`
+      SELECT q.*, cat.name AS category_name,
+        (SELECT COUNT(*) FROM quiz_questions WHERE quiz_id=q.id) AS question_count
+      FROM quizzes q LEFT JOIN categories cat ON cat.id = q.category_id
+      WHERE ${where} ORDER BY q.created_at DESC`, params);
+    return r.rows;
   },
   async delete(id) {
     await db.query('DELETE FROM quizzes WHERE id=$1', [id]);

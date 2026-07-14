@@ -11,7 +11,9 @@ exports.students = async (req, res) => {
 exports.studentDetail = async (req, res) => {
   const student = await User.findById(req.params.id);
   const enrollments = await Enrollment.byUser(req.params.id);
-  res.render('admin/student-detail', { student, enrollments });
+  const BookPurchase = require('../models/BookPurchase');
+  const books = await BookPurchase.byUser(req.params.id);
+  res.render('admin/student-detail', { student, enrollments, books });
 };
 
 exports.toggleStudentActive = async (req, res) => {
