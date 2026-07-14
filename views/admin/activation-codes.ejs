@@ -1,0 +1,43 @@
+<% var pageTitle = 'Mã kích hoạt' %>
+<%- include('../partials/admin-header') %>
+<div class="card p-3 mb-3">
+  <form method="POST" action="/admin/ma-kich-hoat" class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label">Khóa học</label>
+      <select name="course_id" class="form-select" onchange="location='/admin/ma-kich-hoat?course_id='+this.value">
+        <% courses.forEach(c => { %>
+          <option value="<%= c.id %>" <%= selectedCourseId === c.id ? 'selected' : '' %>><%= c.title %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Số lượng mã cần tạo</label>
+      <input type="number" name="quantity" class="form-control" value="10" min="1" max="200">
+    </div>
+    <input type="hidden" name="course_id" value="<%= selectedCourseId %>">
+    <div class="col-md-3"><button class="btn btn-primary">Tạo mã</button></div>
+  </form>
+</div>
+<div class="card p-3">
+  <table class="table">
+    <thead><tr><th>Mã</th><th>Trạng thái</th><th>Ngày tạo</th><th></th></tr></thead>
+    <tbody>
+      <% codes.forEach(c => { %>
+        <tr>
+          <td><code><%= c.code %></code></td>
+          <td><span class="badge bg-<%= c.is_used ? 'secondary' : 'success' %>"><%= c.is_used ? 'Đã dùng' : 'Chưa dùng' %></span></td>
+          <td><%= formatDate(c.created_at) %></td>
+          <td>
+            <% if (!c.is_used) { %>
+              <form method="POST" action="/admin/ma-kich-hoat/<%= c.id %>/xoa" onsubmit="return confirm('Xóa mã này?')">
+                <button class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (codes.length === 0) { %><tr><td colspan="4" class="text-center text-muted">Chưa có mã nào cho khóa học này.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+<%- include('../partials/admin-footer') %>

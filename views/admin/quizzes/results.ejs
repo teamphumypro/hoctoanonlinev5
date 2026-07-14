@@ -1,0 +1,39 @@
+<% var pageTitle = 'Bảng điểm: ' + quiz.title %>
+<%- include('../../partials/admin-header') %>
+
+<% if (pending.length > 0) { %>
+<div class="card p-3 mb-3 border-warning">
+  <h6 class="fw-bold mb-2">✍️ Cần chấm tay (<%= pending.length %> bài)</h6>
+  <% pending.forEach(p => { %>
+    <div class="border rounded p-2 mb-2">
+      <div class="small text-muted">Học viên: <strong><%= p.user_name %></strong> — Câu hỏi: <%= p.question %> (tối đa <%= p.max_points %>đ)</div>
+      <div class="p-2 bg-light rounded my-2" style="white-space:pre-wrap"><%= p.answer_text %></div>
+      <form method="POST" action="/admin/bai-kiem-tra/cham-tay" class="d-flex gap-2 align-items-center">
+        <input type="hidden" name="answer_id" value="<%= p.id %>">
+        <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
+        <input type="number" step="0.05" min="0" max="<%= p.max_points %>" name="points" class="form-control form-control-sm" style="width:100px" placeholder="Điểm" required>
+        <button class="btn btn-sm btn-primary">Lưu điểm</button>
+      </form>
+    </div>
+  <% }) %>
+</div>
+<% } %>
+
+<div class="card p-3">
+  <table class="table">
+    <thead><tr><th>Học viên</th><th>Điểm</th><th>Kết quả</th><th>Thời gian làm bài</th></tr></thead>
+    <tbody>
+      <% attempts.forEach(a => { %>
+        <tr>
+          <td><%= a.user_name %><br><small class="text-muted"><%= a.email %></small></td>
+          <td><%= a.score %>/<%= a.total %></td>
+          <td><span class="badge bg-<%= a.passed ? 'success' : 'danger' %>"><%= a.passed ? 'Đạt' : 'Chưa đạt / Chưa chấm xong' %></span></td>
+          <td><%= formatDate(a.attempted_at) %></td>
+        </tr>
+      <% }) %>
+      <% if (attempts.length === 0) { %><tr><td colspan="4" class="text-center text-muted">Chưa có học viên nào làm bài.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../../partials/admin-footer') %>

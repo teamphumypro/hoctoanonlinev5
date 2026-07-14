@@ -1,0 +1,37 @@
+<% var pageTitle = 'Tải đề thi từ file' %>
+<%- include('../../partials/admin-header') %>
+
+<div class="card p-4" style="max-width:600px">
+  <h6 class="fw-bold mb-1">Tải đề thi từ file Word/PDF</h6>
+  <p class="small text-muted mb-3">Bài kiểm tra: <strong><%= quiz.title %></strong></p>
+
+  <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
+
+  <div class="alert alert-warning small">
+    <strong>Lưu ý:</strong> hệ thống đọc được văn bản chữ trong file .docx/.pdf, nhưng <strong>không đọc được công thức Toán/Lý/Hóa được chèn bằng công cụ Equation hoặc MathType của Word</strong> (cả 2 đều lưu dưới dạng hình ảnh/đối tượng nhúng, không phải chữ), và <strong>không đọc được PDF dạng ảnh scan</strong> (chỉ đọc được PDF có chữ thật). Sau khi tải lên, bạn sẽ được xem trước và sửa lại toàn bộ trước khi lưu.
+  </div>
+
+  <form method="POST" action="/admin/bai-hoc/<%= lesson.id %>/bai-kiem-tra/tai-de" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label class="form-label">Chọn file đề thi (.docx hoặc .pdf)</label>
+      <input type="file" name="exam_file" class="form-control" accept=".docx,.pdf" required>
+    </div>
+
+    <% if (aiConfigured) { %>
+      <div class="form-check mb-3">
+        <input type="checkbox" name="use_ai" class="form-check-input" id="useAi" checked>
+        <label class="form-check-label" for="useAi">Dùng AI để nhận diện thông minh hơn (chính xác hơn, tốn phí nhỏ theo API Key bạn đã cấu hình)</label>
+      </div>
+    <% } else { %>
+      <div class="alert alert-secondary small">
+        Chưa cấu hình AI API Key nên hệ thống sẽ chỉ dò theo mẫu thông thường (độ chính xác thấp hơn).
+        Vào <a href="/admin/cai-dat/ai">Cài đặt AI</a> để bật tính năng nhận diện thông minh hơn.
+      </div>
+    <% } %>
+
+    <button class="btn btn-primary">Tải lên và phân tích</button>
+    <a href="/admin/bai-hoc/<%= lesson.id %>/bai-kiem-tra" class="btn btn-outline-secondary">Hủy</a>
+  </form>
+</div>
+
+<%- include('../../partials/admin-footer') %>

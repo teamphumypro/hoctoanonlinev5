@@ -1,0 +1,26 @@
+<% var pageTitle = 'Học viên' %>
+<%- include('../partials/admin-header') %>
+<div class="card p-3">
+  <table class="table">
+    <thead><tr><th>Avatar</th><th>Họ tên</th><th>Email</th><th>Điểm</th><th>Ngày tham gia</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody>
+      <% students.forEach(s => { %>
+        <tr>
+          <td><img src="<%= s.avatar_url || '/img/placeholder.svg' %>" width="36" height="36" class="rounded-circle" style="object-fit:cover"></td>
+          <td><a href="/admin/hoc-vien/<%= s.id %>"><%= s.name %></a></td>
+          <td><%= s.email %></td>
+          <td><%= s.points %></td>
+          <td><%= formatDate(s.created_at) %></td>
+          <td><span class="badge bg-<%= s.is_active ? 'success' : 'secondary' %>"><%= s.is_active ? 'Hoạt động' : 'Đã khóa' %></span></td>
+          <td>
+            <form method="POST" action="/admin/hoc-vien/<%= s.id %>/khoa-mo" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary"><%= s.is_active ? 'Khóa' : 'Mở khóa' %></button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (students.length === 0) { %><tr><td colspan="7" class="text-center text-muted">Chưa có học viên nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+<%- include('../partials/admin-footer') %>

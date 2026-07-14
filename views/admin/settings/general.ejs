@@ -1,0 +1,35 @@
+<% var pageTitle = 'Cài đặt chung' %>
+<%- include('../../partials/admin-header') %>
+
+<% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+<form method="POST" action="/admin/cai-dat/chung">
+  <div class="card p-4 mb-3">
+    <h6 class="fw-bold mb-3">🏷️ Tên website</h6>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Phần 1 (màu đen)</label>
+        <input name="site_name_1" class="form-control" value="<%= config.site_name_1 || 'Học' %>"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Phần 2 (màu cam)</label>
+        <input name="site_name_2" class="form-control" value="<%= config.site_name_2 || 'Online' %>"></div>
+    </div>
+    <div class="small text-muted">Hiện ở góc trên bên trái trang web và tiêu đề tab trình duyệt.</div>
+  </div>
+
+  <div class="card p-4 mb-3">
+    <h6 class="fw-bold mb-3">🖼️ Banner trang chủ</h6>
+    <div class="mb-3"><label class="form-label">Tiêu đề lớn</label>
+      <input name="hero_title" class="form-control" value="<%= config.hero_title || 'Học mọi lúc, mọi nơi' %>"></div>
+    <div class="mb-1"><label class="form-label">Mô tả nhỏ bên dưới</label>
+      <input name="hero_subtitle" class="form-control" value="<%= config.hero_subtitle || 'Nền tảng khóa học video trực tuyến với hàng trăm bài giảng chất lượng.' %>"></div>
+  </div>
+
+  <div class="card p-4 mb-3">
+    <h6 class="fw-bold mb-3">📄 Chân trang (Footer)</h6>
+    <div class="mb-1"><label class="form-label">Dòng chữ cuối trang (đứng sau © năm)</label>
+      <input name="footer_text" class="form-control" value="<%= config.footer_text || 'HọcOnline — Hệ thống quản lý học tập (LMS)' %>"></div>
+  </div>
+
+  <button class="btn btn-primary">Lưu cài đặt</button>
+</form>
+
+<%- include('../../partials/admin-footer') %>

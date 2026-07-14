@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle + ' - Quản trị' : 'Quản trị' %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="admin-wrap">
+  <div class="admin-sidebar py-3">
+    <div class="px-3 mb-3 text-white fw-bold fs-5"><%= site.site_name_1 %><span style="color:var(--orange)"><%= site.site_name_2 %></span> <span class="fw-normal fs-6 opacity-75">Admin</span></div>
+    <a href="/admin" class="<%= path === '/admin' ? 'active' : '' %>"><i class="fa-solid fa-chart-line me-2"></i>Dashboard</a>
+
+    <div class="section-title">📚 Quản lý khóa học</div>
+    <a href="/admin/danh-muc" class="<%= path.startsWith('/admin/danh-muc') ? 'active' : '' %>">Danh mục</a>
+    <a href="/admin/khoa-hoc" class="<%= path.startsWith('/admin/khoa-hoc') ? 'active' : '' %>">Khóa học / Chương / Bài / Video</a>
+    <a href="/admin/sach" class="<%= path.startsWith('/admin/sach') ? 'active' : '' %>">Sách</a>
+
+    <div class="section-title">👨‍🎓 Học viên</div>
+    <a href="/admin/hoc-vien" class="<%= path.startsWith('/admin/hoc-vien') ? 'active' : '' %>">Danh sách học viên</a>
+
+    <div class="section-title">💳 Thanh toán</div>
+    <a href="/admin/don-hang" class="<%= path.startsWith('/admin/don-hang') ? 'active' : '' %>">Đơn hàng</a>
+    <a href="/admin/ma-kich-hoat" class="<%= path.startsWith('/admin/ma-kich-hoat') ? 'active' : '' %>">Mã kích hoạt</a>
+    <a href="/admin/cai-dat/chung" class="<%= path === '/admin/cai-dat/chung' ? 'active' : '' %>">Cài đặt chung (chữ trên web)</a>
+    <a href="/admin/cai-dat/ai" class="<%= path === '/admin/cai-dat/ai' ? 'active' : '' %>">Cài đặt AI (nhập đề từ file)</a>
+    <a href="/admin/cai-dat/thanh-toan" class="<%= path.startsWith('/admin/cai-dat/thanh-toan') ? 'active' : '' %>">Cài đặt thanh toán</a>
+
+    <div class="section-title">⚙ Cài đặt</div>
+    <a href="/admin/banner" class="<%= path.startsWith('/admin/banner') ? 'active' : '' %>">Banner</a>
+    <a href="/admin/popup" class="<%= path.startsWith('/admin/popup') ? 'active' : '' %>">Popup quảng cáo</a>
+    <a href="/admin/menu" class="<%= path.startsWith('/admin/menu') ? 'active' : '' %>">Menu điều hướng</a>
+    <a href="/admin/tin-tuc" class="<%= path.startsWith('/admin/tin-tuc') ? 'active' : '' %>">Tin tức</a>
+    <a href="/admin/nhan-su" class="<%= path.startsWith('/admin/nhan-su') ? 'active' : '' %>">Nhân sự &amp; phân quyền</a>
+
+    <div class="section-title">👤 Tài khoản</div>
+    <a href="/admin/doi-mat-khau" class="<%= path.startsWith('/admin/doi-mat-khau') ? 'active' : '' %>">Đổi mật khẩu</a>
+    <a href="/admin/dang-xuat" class="text-danger">Đăng xuất</a>
+  </div>
+  <div class="admin-main">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold mb-0"><%= typeof pageTitle !== 'undefined' ? pageTitle : '' %></h4>
+      <div class="text-muted small">Xin chào, <strong><%= adminUser.name %></strong> (<%= adminUser.role %>)</div>
+    </div>

@@ -1,0 +1,61 @@
+<% var pageTitle = book ? 'Sửa sách' : 'Thêm sách' %>
+<%- include('../../partials/admin-header') %>
+<div class="card p-4" style="max-width:700px">
+  <form method="POST" action="<%= book ? '/admin/sach/' + book.id : '/admin/sach' %>" enctype="multipart/form-data">
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Danh mục (Lớp/Môn — dùng chung với Khóa học)</label>
+        <select name="category_id" class="form-select">
+          <option value="">-- Chọn danh mục --</option>
+          <% categories.forEach(c => { %>
+            <option value="<%= c.id %>" <%= book && book.category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-6 mb-3"><label class="form-label">Thể loại sách</label>
+        <select name="book_type_id" class="form-select">
+          <option value="">-- Chọn thể loại --</option>
+          <% bookTypes.forEach(t => { %>
+            <option value="<%= t.id %>" <%= book && book.book_type_id === t.id ? 'selected' : '' %>><%= t.name %></option>
+          <% }) %>
+        </select>
+        <div class="form-text">Chưa có thể loại phù hợp? <a href="/admin/sach/loai" target="_blank">Quản lý thể loại sách</a></div>
+      </div>
+    </div>
+    <div class="mb-3"><label class="form-label">Tên sách</label>
+      <input name="title" class="form-control" value="<%= book ? book.title : '' %>" required></div>
+    <div class="mb-3"><label class="form-label">Tác giả</label>
+      <input name="author" class="form-control" value="<%= book ? book.author : '' %>"></div>
+    <div class="mb-3"><label class="form-label">Mô tả ngắn</label>
+      <input name="short_desc" class="form-control" value="<%= book ? book.short_desc : '' %>"></div>
+    <div class="mb-3"><label class="form-label">Mô tả chi tiết</label>
+      <textarea name="description" class="form-control" rows="4"><%= book ? book.description : '' %></textarea></div>
+    <div class="row">
+      <div class="col-md-6 mb-3"><label class="form-label">Giá bán (VNĐ)</label>
+        <input type="number" name="price" class="form-control" value="<%= book ? book.price : 0 %>"></div>
+      <div class="col-md-6 mb-3"><label class="form-label">Giá gốc (tùy chọn, hiện gạch ngang)</label>
+        <input type="number" name="compare_at_price" class="form-control" value="<%= book && book.compare_at_price ? book.compare_at_price : '' %>"></div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Ảnh bìa</label>
+      <% if (book && book.cover_url) { %><div class="mb-2"><img src="<%= book.cover_url %>" style="height:80px;border-radius:6px"></div><% } %>
+      <input type="file" name="cover" class="form-control mb-2" accept="image/*">
+      <input type="url" name="cover_url_link" class="form-control" placeholder="... hoặc dán link ảnh bìa">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Link file ebook (PDF/Google Drive...) — gửi cho khách sau khi mua thành công</label>
+      <input type="url" name="file_url" class="form-control" value="<%= book ? book.file_url : '' %>" placeholder="https://drive.google.com/...">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Link PDF đọc thử (tùy chọn) — khách xem trước ngay trên trang web, không cần mua</label>
+      <input type="url" name="preview_url" class="form-control" value="<%= book && book.preview_url ? book.preview_url : '' %>" placeholder="https://drive.google.com/... (link chia sẻ công khai)">
+      <div class="form-text">Nếu dùng Google Drive: bấm Chia sẻ → "Bất kỳ ai có đường liên kết" → dán link vào đây.</div>
+    </div>
+    <div class="form-check mb-3">
+      <input type="checkbox" name="is_published" class="form-check-input" <%= (!book || book.is_published) ? 'checked' : '' %>>
+      <label class="form-check-label">Hiển thị công khai</label>
+    </div>
+    <button class="btn btn-primary">Lưu</button>
+    <a href="/admin/sach" class="btn btn-outline-secondary">Hủy</a>
+  </form>
+</div>
+<%- include('../../partials/admin-footer') %>
