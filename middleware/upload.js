@@ -1,10 +1,16 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 function makeStorage(subfolder) {
+  const dir = path.join(__dirname, '..', 'public', 'uploads', subfolder);
   return multer.diskStorage({
-    destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'public', 'uploads', subfolder)),
+    destination: (req, file, cb) => {
+      // Tu tao thu muc neu chua co, tranh loi ENOENT khi thu muc rong bi thieu luc dua code len GitHub
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname);
       cb(null, uuidv4() + ext);
