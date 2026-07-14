@@ -270,17 +270,8 @@ CREATE TABLE IF NOT EXISTS popups (
 );
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS compare_at_price INTEGER;
 
--- ---------- BO SUNG: video gioi thieu khoa hoc + doc thu sach + phan loai sach ----------
+-- ---------- BO SUNG: video gioi thieu khoa hoc ----------
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS intro_video_url TEXT;
-ALTER TABLE books ADD COLUMN IF NOT EXISTS preview_url TEXT; -- link PDF doc thu (Google Drive...)
-ALTER TABLE books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL; -- dung chung he thong Lop/Mon voi Khoa hoc
-CREATE TABLE IF NOT EXISTS book_types (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  position INTEGER NOT NULL DEFAULT 0
-);
-ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type_id INTEGER REFERENCES book_types(id) ON DELETE SET NULL;
 
 -- ---------- BANG TIN CONG DONG (dang trang thai/anh/video dang link) ----------
 CREATE TABLE IF NOT EXISTS posts (
@@ -362,3 +353,14 @@ BEGIN
   ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
     CHECK (payment_method IN ('vnpay','momo','zalopay','bank_transfer','activation_code','cod'));
 END $$;
+
+-- ---------- BO SUNG: doc thu sach + phan loai sach (dat cuoi file vi can bang books da ton tai) ----------
+ALTER TABLE books ADD COLUMN IF NOT EXISTS preview_url TEXT; -- link PDF doc thu (Google Drive...)
+ALTER TABLE books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL; -- dung chung he thong Lop/Mon voi Khoa hoc
+CREATE TABLE IF NOT EXISTS book_types (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type_id INTEGER REFERENCES book_types(id) ON DELETE SET NULL;
