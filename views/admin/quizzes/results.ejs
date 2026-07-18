@@ -19,6 +19,37 @@
 </div>
 <% } %>
 
+<div class="card p-3 mb-3">
+  <h6 class="fw-bold mb-2">📊 Thống kê tỷ lệ đúng/sai từng câu</h6>
+  <table class="table table-sm">
+    <thead><tr><th>Câu hỏi</th><th>Dạng</th><th>Số lượt làm</th><th>Tỷ lệ đúng</th></tr></thead>
+    <tbody>
+      <% questionStats.forEach((s, i) => { %>
+        <tr>
+          <td>Câu <%= i+1 %>: <%= s.question.length > 80 ? s.question.slice(0,80)+'...' : s.question %></td>
+          <td><span class="badge bg-secondary"><%=
+            s.type === 'single_choice' ? 'Trắc nghiệm' :
+            s.type === 'true_false' ? 'Đúng/Sai' :
+            s.type === 'short_answer' ? 'Trả lời ngắn' : 'Tự luận' %></span></td>
+          <td><%= s.totalCount %></td>
+          <td>
+            <% if (s.correctPercent === null) { %><span class="text-muted">—</span>
+            <% } else { %>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px; max-width:120px">
+                  <div class="progress-bar bg-<%= s.correctPercent >= 70 ? 'success' : s.correctPercent >= 40 ? 'warning' : 'danger' %>" style="width:<%= s.correctPercent %>%"></div>
+                </div>
+                <span class="small fw-bold"><%= s.correctPercent %>%</span>
+              </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (questionStats.length === 0) { %><tr><td colspan="4" class="text-center text-muted">Chưa có câu hỏi nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
 <div class="card p-3">
   <table class="table">
     <thead><tr><th>Học viên</th><th>Điểm</th><th>Kết quả</th><th>Thời gian làm bài</th></tr></thead>
@@ -28,7 +59,7 @@
           <td><%= a.user_name %><br><small class="text-muted"><%= a.email %></small></td>
           <td><%= a.score %>/<%= a.total %></td>
           <td><span class="badge bg-<%= a.passed ? 'success' : 'danger' %>"><%= a.passed ? 'Đạt' : 'Chưa đạt / Chưa chấm xong' %></span></td>
-          <td><%= formatDate(a.attempted_at) %></td>
+          <td><%= formatDate(a.attempted_at) %><% if (a.duration_seconds) { %><br><small class="text-muted"><%= Math.floor(a.duration_seconds/60) %> phút <%= a.duration_seconds%60 %> giây</small><% } %></td>
         </tr>
       <% }) %>
       <% if (attempts.length === 0) { %><tr><td colspan="4" class="text-center text-muted">Chưa có học viên nào làm bài.</td></tr><% } %>

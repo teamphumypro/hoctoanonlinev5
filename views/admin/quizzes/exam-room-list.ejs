@@ -13,7 +13,9 @@
           <td><%= e.question_count %></td>
           <td class="text-nowrap">
             <a href="/admin/bai-kiem-tra/<%= e.id %>/cau-hoi" class="btn btn-sm btn-outline-primary">Câu hỏi</a>
+            <a href="/admin/bai-kiem-tra/<%= e.id %>/giao-de" class="btn btn-sm btn-outline-info">Giao đề</a>
             <a href="/admin/bai-kiem-tra/<%= e.id %>/ket-qua" class="btn btn-sm btn-outline-secondary">Bảng điểm</a>
+            <a href="/thi/<%= e.id %>/xep-hang" target="_blank" class="btn btn-sm btn-outline-warning">Xếp hạng</a>
             <form method="POST" action="/admin/bai-kiem-tra/<%= e.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa đề thi này?')">
               <button class="btn btn-sm btn-outline-danger">Xóa</button>
             </form>

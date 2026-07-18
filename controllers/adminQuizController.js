@@ -1,6 +1,7 @@
 const Quiz = require('../models/Quiz');
 const Lesson = require('../models/Lesson');
 const Category = require('../models/Category');
+const User = require('../models/User');
 
 // Xac dinh trang "quay lai" phu hop: de gan bai hoc thi ve trang noi dung bai hoc do,
 // de doc lap (Thuc chien phong thi) thi ve trang quan ly cau hoi cua chinh no
@@ -81,7 +82,8 @@ exports.results = async (req, res) => {
   if (!quiz) return res.redirect('/admin/khoa-hoc');
   const attempts = await Quiz.attemptsByQuiz(quiz.id);
   const pending = await Quiz.pendingManualGrading(quiz.id);
-  res.render('admin/quizzes/results', { quiz, attempts, pending });
+  const questionStats = await Quiz.questionStats(quiz.id);
+  res.render('admin/quizzes/results', { quiz, attempts, pending, questionStats });
 };
 
 // Cham diem 1 cau tu luan/tra loi ngan can cham tay
@@ -103,7 +105,35 @@ exports.examRoomNewForm = async (req, res) => {
 };
 
 exports.examRoomCreate = async (req, res) => {
-  const { title, pass_score, category_id } = req.body;
-  const quiz = await Quiz.create({ title, pass_score, category_id, is_standalone: true });
+  const { title, pass_score, category_id, time_limit_minutes, shuffle_questions, shuffle_answers, visibility } = req.body;
+  const quiz = await Quiz.create({
+    title, pass_score, category_id, is_standalone: true,
+    time_limit_minutes: time_limit_minutes || null,
+    shuffle_questions: shuffle_questions === 'on', shuffle_answers: shuffle_answers === 'on',
+    visibility: visibility || 'public'
+  });
+  if (visibility === 'assigned') return res.redirect(`/admin/bai-kiem-tra/${quiz.id}/giao-de`);
   res.redirect(`/admin/bai-kiem-tra/${quiz.id}/cau-hoi`);
+};
+
+// ---- Giao de rieng cho hoc vien cu the kem han nop ----
+exports.assignForm = async (req, res) => {
+  const quiz = await Quiz.findById(req.params.quizId);
+  if (!quiz) return res.redirect('/admin/phong-thi');
+  const students = await User.listStudents();
+  const assignedUsers = await Quiz.assignedUsers(quiz.id);
+  const assignedIds = assignedUsers.map(a => a.user_id);
+  res.render('admin/quizzes/assign', { quiz, students, assignedUsers, assignedIds });
+};
+
+exports.assignSubmit = async (req, res) => {
+  const quizId = req.params.quizId;
+  const userIds = req.body.user_ids ? [].concat(req.body.user_ids) : [];
+  await Quiz.assignTo(quizId, userIds, req.body.due_at || null);
+  res.redirect(`/admin/bai-kiem-tra/${quizId}/giao-de`);
+};
+
+exports.unassign = async (req, res) => {
+  await Quiz.unassign(req.params.quizId, req.params.userId);
+  res.redirect(`/admin/bai-kiem-tra/${req.params.quizId}/giao-de`);
 };

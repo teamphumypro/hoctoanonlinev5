@@ -18,8 +18,7 @@
     <a href="/admin/danh-muc" class="<%= path.startsWith('/admin/danh-muc') ? 'active' : '' %>"><i class="fa-solid fa-sitemap me-2"></i>Danh mục</a>
     <a href="/admin/khoa-hoc" class="<%= path.startsWith('/admin/khoa-hoc') ? 'active' : '' %>"><i class="fa-solid fa-book-open me-2"></i>Khóa học / Chương / Bài / Video</a>
     <a href="/admin/sach" class="<%= path === '/admin/sach' || path.startsWith('/admin/sach/them') || path.match(/^\/admin\/sach\/\d+/) ? 'active' : '' %>"><i class="fa-solid fa-book me-2"></i>Sách (bán/tải file)</a>
-    <a href="/admin/doc-sach-online" class="<%= path.startsWith('/admin/doc-sach-online') && !path.startsWith('/admin/doc-sach-online/danh-muc') ? 'active' : '' %>"><i class="fa-solid fa-book-open-reader me-2"></i>Đọc sách online</a>
-    <a href="/admin/doc-sach-online/danh-muc" class="<%= path.startsWith('/admin/doc-sach-online/danh-muc') ? 'active' : '' %>"><i class="fa-solid fa-sitemap me-2"></i>Danh mục đọc sách online</a>
+    <a href="/admin/doc-sach-online" class="<%= path.startsWith('/admin/doc-sach-online') ? 'active' : '' %>"><i class="fa-solid fa-book-open-reader me-2"></i>Đọc sách online</a>
     <a href="/admin/sach/danh-muc" class="<%= path.startsWith('/admin/sach/danh-muc') ? 'active' : '' %>"><i class="fa-solid fa-sitemap me-2"></i>Danh mục sách</a>
     <a href="/admin/sach/loai" class="<%= path === '/admin/sach/loai' ? 'active' : '' %>"><i class="fa-solid fa-tags me-2"></i>Thể loại sách</a>
     <a href="/admin/phong-thi" class="<%= path.startsWith('/admin/phong-thi') || path.startsWith('/admin/bai-kiem-tra') ? 'active' : '' %>"><i class="fa-solid fa-user-graduate me-2"></i>Thực chiến phòng thi</a>

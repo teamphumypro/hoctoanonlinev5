@@ -10,21 +10,6 @@
         <input name="author" class="form-control" value="<%= book ? book.author : '' %>"></div>
       <div class="mb-3"><label class="form-label">Mô tả ngắn</label>
         <input name="short_desc" class="form-control" value="<%= book ? book.short_desc : '' %>"></div>
-      <div class="mb-3"><label class="form-label">Danh mục <span class="text-muted fw-normal">(tùy chọn)</span></label>
-        <select name="category_id" class="form-select">
-          <option value="">-- Không thuộc danh mục cụ thể --</option>
-          <% function renderOnlineCatOptions(cats, depth) { %>
-            <% cats.forEach(c => { %>
-              <option value="<%= c.id %>" <%= book && book.category_id === c.id ? 'selected' : '' %>>
-                <%= '\u00A0\u00A0\u00A0\u00A0'.repeat(depth) %><%= depth > 0 ? '↳ ' : '' %><%= c.name %>
-              </option>
-              <% if (c.children && c.children.length) renderOnlineCatOptions(c.children, depth + 1) %>
-            <% }) %>
-          <% } %>
-          <% renderOnlineCatOptions(categories, 0) %>
-        </select>
-        <div class="form-text">Chưa có danh mục phù hợp? Vào menu <strong>"Danh mục đọc sách online"</strong> bên trái để thêm trước.</div>
-      </div>
       <div class="mb-0"><label class="form-label">Mô tả chi tiết</label>
         <div id="descEditor" style="height:180px; background:#fff"></div>
         <input type="hidden" name="description" id="descHidden" value="<%= book ? book.description : '' %>">
@@ -39,29 +24,6 @@
         <div class="col-md-6 mb-0"><label class="form-label">Giá gốc (tùy chọn, hiện gạch ngang)</label>
           <input type="number" name="compare_at_price" class="form-control" value="<%= book && book.compare_at_price ? book.compare_at_price : '' %>"></div>
       </div>
-    </div>
-
-    <div class="card p-4 mb-3">
-      <h6 class="fw-bold mb-3">File sách (đọc kiểu lật trang)</h6>
-      <div class="alert alert-info small mb-3">
-        Chỉ cần <b>1 file PDF duy nhất</b> — không cần tách chương. Bạn có thể tải file lên trực tiếp,
-        hoặc dán link file PDF đang lưu ở bất kỳ nơi nào (Google Drive, Dropbox, CDN riêng...).
-        Nếu dùng link Google Drive, nhớ bật chia sẻ "Bất kỳ ai có đường liên kết".
-      </div>
-      <% if (book && book.file_url) { %>
-        <div class="mb-2 small">Đang dùng: <span class="badge bg-<%= book.file_source === 'upload' ? 'secondary' : 'info' %>"><%= book.file_source === 'upload' ? 'File đã tải lên' : 'Link dán tay' %></span>
-          <% if (book.file_source !== 'upload') { %> — <a href="<%= book.file_url %>" target="_blank" rel="noopener"><%= book.file_url %></a><% } %>
-        </div>
-      <% } %>
-      <div class="btn-group btn-group-sm mb-2" role="group">
-        <input type="radio" class="btn-check" name="file_mode" id="fileModeUpload" checked>
-        <label class="btn btn-outline-secondary" for="fileModeUpload">Tải file PDF lên</label>
-        <input type="radio" class="btn-check" name="file_mode" id="fileModeLink">
-        <label class="btn btn-outline-secondary" for="fileModeLink">Dán link file PDF</label>
-      </div>
-      <div id="bookFileUploadField"><input type="file" name="book_file" class="form-control" accept="application/pdf,.pdf"></div>
-      <div id="bookFileLinkField" class="d-none"><input type="url" name="book_file_link" class="form-control" placeholder="https://drive.google.com/file/d/.../view hoặc https://.../sach.pdf"></div>
-      <div class="form-text">Để trống nếu chưa muốn thay đổi file hiện tại.</div>
     </div>
 
     <div class="card p-4 mb-3">
@@ -97,13 +59,6 @@
   document.getElementById('coverModeLink').addEventListener('change', () => { cl.classList.remove('d-none'); cu.classList.add('d-none'); });
   <% if (book && book.cover_url && book.cover_url.startsWith('http')) { %>
     document.getElementById('coverModeLink').checked = true; cl.classList.remove('d-none'); cu.classList.add('d-none');
-  <% } %>
-
-  const bfu = document.getElementById('bookFileUploadField'), bfl = document.getElementById('bookFileLinkField');
-  document.getElementById('fileModeUpload').addEventListener('change', () => { bfu.classList.remove('d-none'); bfl.classList.add('d-none'); });
-  document.getElementById('fileModeLink').addEventListener('change', () => { bfl.classList.remove('d-none'); bfu.classList.add('d-none'); });
-  <% if (book && book.file_source === 'link') { %>
-    document.getElementById('fileModeLink').checked = true; bfl.classList.remove('d-none'); bfu.classList.add('d-none');
   <% } %>
 
   const descQuill = new Quill('#descEditor', {

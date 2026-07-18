@@ -43,13 +43,8 @@ const wrapAsync = (fn) => {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Mac dinh body-parser chi cho phep 100kb/request. Man hinh "Xem lai & Luu chuong" cua sach doc online
-// gui ca noi dung van ban toan bo cuon sach (da tach chuong) len cung 1 luc qua form thuong (khong phai
-// upload file), sach dai de vuot qua 100kb -> loi "PayloadTooLargeError: request entity too large".
-// Nang gioi han len de chua duoc nhung cuon sach dai ma van an toan (khong lien quan gi den upload file,
-// vi upload file da co gioi han rieng o middleware/upload.js).
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
-app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 

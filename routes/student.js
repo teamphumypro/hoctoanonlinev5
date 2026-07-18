@@ -24,6 +24,8 @@ router.get('/hoc/:id', studentController.watchLesson); // co the la bai preview 
 
 router.get('/thi/:id', requireLogin, quizController.take);
 router.post('/thi/:id/nop-bai', requireLogin, quizController.submit);
+router.get('/thi/:id/xep-hang', requireLogin, quizController.leaderboard);
+router.get('/tai-khoan/bai-duoc-giao', requireLogin, quizController.myAssignments);
 
 // ---- Gio hang & thanh toan (khoa hoc + sach mua chung) ----
 router.get('/gio-hang', requireLogin, cartController.view);

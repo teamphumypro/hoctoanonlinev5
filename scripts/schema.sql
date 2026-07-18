@@ -379,9 +379,6 @@ CREATE TABLE IF NOT EXISTS online_books (
   is_published INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT now()
 );
--- BO SUNG: doc sach truc tiep tu 1 file PDF (upload hoac dan link bat ky), khong bat buoc phai tach chuong
-ALTER TABLE online_books ADD COLUMN IF NOT EXISTS file_url TEXT;
-ALTER TABLE online_books ADD COLUMN IF NOT EXISTS file_source TEXT; -- 'upload' hoac 'link'
 CREATE TABLE IF NOT EXISTS online_book_chapters (
   id SERIAL PRIMARY KEY,
   online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,
@@ -391,17 +388,6 @@ CREATE TABLE IF NOT EXISTS online_book_chapters (
   position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
--- BO SUNG: muc luc go tay (tieu de + so trang) cho sach doc online kieu 1 file PDF,
--- de nguoi doc bam vao la nhay thang toi dung trang, khong phu thuoc vao viec tu nhan dien.
-CREATE TABLE IF NOT EXISTS online_book_toc_entries (
-  id SERIAL PRIMARY KEY,
-  online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  page_number INTEGER NOT NULL, -- so trang nguoi doc se thay (bat dau tu 1)
-  position INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS online_book_purchases (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -426,6 +412,31 @@ ALTER TABLE quizzes ALTER COLUMN lesson_id DROP NOT NULL;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_standalone INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+
+-- ---------- BO SUNG: trai nghiem thi kieu Azota/EduQuiz (dem gio, tron de, xep hang, giao de rieng) ----------
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle_questions INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle_answers INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'; -- 'public' hoac 'assigned'
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS duration_seconds INTEGER; -- thoi gian thuc te lam bai, dung de xep hang khi diem bang nhau
+
+CREATE TABLE IF NOT EXISTS quiz_assignments (
+  id SERIAL PRIMARY KEY,
+  quiz_id INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  due_at TIMESTAMPTZ,
+  assigned_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(quiz_id, user_id)
+);
+
+-- Ghi lai thoi diem bat dau lam bai de tinh dem nguoc chinh xac (chong load lai trang bi reset gio)
+CREATE TABLE IF NOT EXISTS quiz_starts (
+  id SERIAL PRIMARY KEY,
+  quiz_id INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(quiz_id, user_id)
+);
 
 -- ---------- BO SUNG: vong doi ma kich hoat (han dung, vo hieu hoa thu cong) ----------
 ALTER TABLE activation_codes ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
@@ -474,14 +485,3 @@ CREATE TABLE IF NOT EXISTS book_types (
   position INTEGER NOT NULL DEFAULT 0
 );
 ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type_id INTEGER REFERENCES book_types(id) ON DELETE SET NULL;
-
--- ---------- BO SUNG: Danh muc rieng cho "Doc sach online", TACH BIET hoan toan voi Danh muc Sach (book_categories) ----------
-CREATE TABLE IF NOT EXISTS online_book_categories (
-  id SERIAL PRIMARY KEY,
-  parent_id INTEGER REFERENCES online_book_categories(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  position INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE online_books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES online_book_categories(id) ON DELETE SET NULL;

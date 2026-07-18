@@ -15,12 +15,22 @@ const Quiz = {
       WHERE q.id=$1`, [id]);
     return r.rows[0];
   },
-  async create({ lesson_id, title, pass_score, category_id, is_standalone }) {
+  async create({ lesson_id, title, pass_score, category_id, is_standalone, time_limit_minutes, shuffle_questions, shuffle_answers, visibility }) {
     const r = await db.query(
-      `INSERT INTO quizzes (lesson_id, title, pass_score, category_id, is_standalone) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [lesson_id || null, title, pass_score || 5, category_id || null, is_standalone ? 1 : 0]
+      `INSERT INTO quizzes (lesson_id, title, pass_score, category_id, is_standalone, time_limit_minutes, shuffle_questions, shuffle_answers, visibility)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [lesson_id || null, title, pass_score || 5, category_id || null, is_standalone ? 1 : 0,
+       time_limit_minutes || null, shuffle_questions ? 1 : 0, shuffle_answers ? 1 : 0, visibility || 'public']
     );
     return r.rows[0];
+  },
+  async updateSettings(id, { title, pass_score, category_id, time_limit_minutes, shuffle_questions, shuffle_answers, visibility }) {
+    await db.query(
+      `UPDATE quizzes SET title=$1, pass_score=$2, category_id=$3, time_limit_minutes=$4,
+       shuffle_questions=$5, shuffle_answers=$6, visibility=$7 WHERE id=$8`,
+      [title, pass_score || 5, category_id || null, time_limit_minutes || null,
+       shuffle_questions ? 1 : 0, shuffle_answers ? 1 : 0, visibility || 'public', id]
+    );
   },
   // Danh sach de thi doc lap (Thuc chien phong thi), khong gan voi bai hoc nao
   async standaloneAll() {
@@ -42,8 +52,100 @@ const Quiz = {
       WHERE ${where} ORDER BY q.created_at DESC`, params);
     return r.rows;
   },
-  async delete(id) {
-    await db.query('DELETE FROM quizzes WHERE id=$1', [id]);
+  // Tron thu tu cau hoi/dap an neu bai kiem tra bat tinh nang nay (chong quay cop giua cac hoc vien)
+  shuffleForAttempt(questions, quiz) {
+    const shuffleArr = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
+    let qs = questions;
+    if (quiz.shuffle_questions) qs = shuffleArr(qs);
+    if (quiz.shuffle_answers) {
+      qs = qs.map(q => {
+        if (q.type === 'single_choice' && q.options) return { ...q, options: shuffleArr(q.options) };
+        return q;
+      });
+    }
+    return qs;
+  },
+
+  // ---- Dem gio lam bai: ghi lai thoi diem bat dau de tinh dem nguoc chinh xac ----
+  async getOrCreateStart(quiz_id, user_id) {
+    const existing = await db.query('SELECT * FROM quiz_starts WHERE quiz_id=$1 AND user_id=$2', [quiz_id, user_id]);
+    if (existing.rows[0]) return existing.rows[0];
+    const r = await db.query('INSERT INTO quiz_starts (quiz_id, user_id) VALUES ($1,$2) RETURNING *', [quiz_id, user_id]);
+    return r.rows[0];
+  },
+  async clearStart(quiz_id, user_id) {
+    await db.query('DELETE FROM quiz_starts WHERE quiz_id=$1 AND user_id=$2', [quiz_id, user_id]);
+  },
+
+  // ---- Bang xep hang theo tung de thi (diem cao nhat cua moi hoc vien, uu tien lam nhanh hon khi bang diem) ----
+  async leaderboard(quiz_id, limit = 50) {
+    const r = await db.query(`
+      SELECT DISTINCT ON (qa.user_id) qa.*, u.name AS user_name, u.avatar_url
+      FROM quiz_attempts qa JOIN users u ON u.id = qa.user_id
+      WHERE qa.quiz_id=$1
+      ORDER BY qa.user_id, qa.score DESC, qa.duration_seconds ASC NULLS LAST, qa.attempted_at ASC`, [quiz_id]);
+    const ranked = r.rows.sort((a, b) => b.score - a.score || (a.duration_seconds || 999999) - (b.duration_seconds || 999999));
+    return ranked.slice(0, limit);
+  },
+
+  // ---- Thong ke ty le dung/sai tung cau, giup giao vien biet cau nao hoc vien hay sai ----
+  async questionStats(quiz_id) {
+    const questions = await this.fullQuestions(quiz_id);
+    const stats = [];
+    for (const q of questions) {
+      let correctCount = 0, totalCount = 0;
+      if (q.type === 'single_choice') {
+        const r = await db.query(`
+          SELECT aa.answer_text FROM quiz_attempt_answers aa WHERE aa.question_id=$1`, [q.id]);
+        totalCount = r.rows.length;
+        const correctOpt = q.options.find(o => o.is_correct);
+        correctCount = r.rows.filter(row => {
+          let parsed; try { parsed = JSON.parse(row.answer_text); } catch (e) { parsed = row.answer_text; }
+          return String(parsed) === String(correctOpt && correctOpt.id);
+        }).length;
+      } else {
+        const r = await db.query(`SELECT awarded_points FROM quiz_attempt_answers WHERE question_id=$1 AND needs_manual_grading=0`, [q.id]);
+        totalCount = r.rows.length;
+        correctCount = r.rows.filter(row => Number(row.awarded_points) >= Number(q.points)).length;
+      }
+      stats.push({
+        question: q.question, type: q.type, totalCount, correctCount,
+        correctPercent: totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : null
+      });
+    }
+    return stats;
+  },
+
+  // ---- Giao de rieng cho hoc vien cu the kem han nop ----
+  async assignTo(quiz_id, userIds, due_at) {
+    for (const uid of userIds) {
+      await db.query(
+        `INSERT INTO quiz_assignments (quiz_id, user_id, due_at) VALUES ($1,$2,$3)
+         ON CONFLICT (quiz_id, user_id) DO UPDATE SET due_at=$3`,
+        [quiz_id, uid, due_at || null]
+      );
+    }
+  },
+  async unassign(quiz_id, user_id) {
+    await db.query('DELETE FROM quiz_assignments WHERE quiz_id=$1 AND user_id=$2', [quiz_id, user_id]);
+  },
+  async assignedUsers(quiz_id) {
+    const r = await db.query(`
+      SELECT qas.*, u.name, u.email FROM quiz_assignments qas
+      JOIN users u ON u.id = qas.user_id WHERE qas.quiz_id=$1 ORDER BY u.name`, [quiz_id]);
+    return r.rows;
+  },
+  async isAssignedTo(quiz_id, user_id) {
+    const r = await db.query('SELECT * FROM quiz_assignments WHERE quiz_id=$1 AND user_id=$2', [quiz_id, user_id]);
+    return r.rows[0] || null;
+  },
+  async myAssignments(user_id) {
+    const r = await db.query(`
+      SELECT qas.*, q.title, q.pass_score,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=q.id AND user_id=$1) AS attempt_count
+      FROM quiz_assignments qas JOIN quizzes q ON q.id = qas.quiz_id
+      WHERE qas.user_id=$1 ORDER BY qas.due_at NULLS LAST, qas.assigned_at DESC`, [user_id]);
+    return r.rows;
   },
 
   // Lay toan bo cau hoi (kem dap an/y dung-sai) cua 1 bai kiem tra
@@ -181,10 +283,10 @@ const Quiz = {
     return { score, total, passed, details, passScore, needsManualGrading };
   },
 
-  async recordAttempt({ quiz_id, user_id, score, total, passed, needsManualGrading }) {
+  async recordAttempt({ quiz_id, user_id, score, total, passed, duration_seconds }) {
     const r = await db.query(
-      `INSERT INTO quiz_attempts (quiz_id, user_id, score, total, passed) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [quiz_id, user_id, score, total, passed ? 1 : 0]
+      `INSERT INTO quiz_attempts (quiz_id, user_id, score, total, passed, duration_seconds) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [quiz_id, user_id, score, total, passed ? 1 : 0, duration_seconds || null]
     );
     return r.rows[0];
   },

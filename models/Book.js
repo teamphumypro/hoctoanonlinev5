@@ -4,26 +4,21 @@ const Book = {
     const r = await db.query(`
       SELECT b.*, cat.name AS category_name, bt.name AS book_type_name
       FROM books b
-      LEFT JOIN book_categories cat ON cat.id = b.category_id
+      LEFT JOIN categories cat ON cat.id = b.category_id
       LEFT JOIN book_types bt ON bt.id = b.book_type_id
       ORDER BY b.created_at DESC`);
     return r.rows;
   },
-  // filters: { category_id, category_ids, book_type_id } - deu tuy chon.
-  // category_ids (mang): dung khi loc theo 1 danh muc cha, gom ca sach cua danh muc con ben trong.
+  // filters: { category_id, book_type_id } - deu tuy chon
   async published(filters = {}) {
     const clauses = ['b.is_published=1'];
     const params = [];
-    if (filters.category_ids && filters.category_ids.length) {
-      params.push(filters.category_ids); clauses.push(`b.category_id = ANY($${params.length}::int[])`);
-    } else if (filters.category_id) {
-      params.push(filters.category_id); clauses.push(`b.category_id=$${params.length}`);
-    }
+    if (filters.category_id) { params.push(filters.category_id); clauses.push(`b.category_id=$${params.length}`); }
     if (filters.book_type_id) { params.push(filters.book_type_id); clauses.push(`b.book_type_id=$${params.length}`); }
     const r = await db.query(`
       SELECT b.*, cat.name AS category_name, bt.name AS book_type_name
       FROM books b
-      LEFT JOIN book_categories cat ON cat.id = b.category_id
+      LEFT JOIN categories cat ON cat.id = b.category_id
       LEFT JOIN book_types bt ON bt.id = b.book_type_id
       WHERE ${clauses.join(' AND ')}
       ORDER BY b.created_at DESC`, params);
@@ -37,7 +32,7 @@ const Book = {
     const r = await db.query(`
       SELECT b.*, cat.name AS category_name, bt.name AS book_type_name
       FROM books b
-      LEFT JOIN book_categories cat ON cat.id = b.category_id
+      LEFT JOIN categories cat ON cat.id = b.category_id
       LEFT JOIN book_types bt ON bt.id = b.book_type_id
       WHERE b.slug=$1`, [slug]);
     return r.rows[0];
