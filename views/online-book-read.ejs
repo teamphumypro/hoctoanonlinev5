@@ -9,12 +9,12 @@
 <div class="d-flex justify-content-center mb-3">
   <div style="position:relative; display:inline-block">
     <div id="flipbook"></div>
-    <div id="tocPanel" class="d-none" style="position:absolute; top:0; left:0; bottom:0; width:280px; max-width:80vw; background:#fff; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:20; overflow-y:auto; padding:14px;">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <b class="small text-uppercase text-muted">Mục lục</b>
+    <div id="tocPanel" class="d-none" style="position:absolute; top:0; left:0; bottom:0; width:300px; max-width:85vw; background:#fff; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:20; overflow-y:auto; padding:0;">
+      <div class="d-flex justify-content-between align-items-center px-3 py-2" style="border-bottom:1px solid #eee; position:sticky; top:0; background:#fff;">
+        <b class="small text-uppercase" style="letter-spacing:.03em; color:#555">Mục lục</b>
         <button type="button" id="tocCloseBtn" class="btn-close btn-sm" aria-label="Đóng"></button>
       </div>
-      <div id="tocList" class="small text-muted">Đang nhận diện mục lục...</div>
+      <div id="tocList" class="text-muted small p-3">Đang nhận diện mục lục...</div>
     </div>
   </div>
 </div>
@@ -57,10 +57,13 @@
   .storypage-inner{ padding:24px; height:100%; overflow-y:auto; font-size:.95rem; line-height:1.7; }
   .storypage.pdfpage{ display:flex; align-items:center; justify-content:center; background:#fff; }
   .storypage.pdfpage canvas{ max-width:100%; max-height:100%; }
-  .toc-item{ display:block; width:100%; text-align:left; background:none; border:0; padding:6px 8px; border-radius:6px; color:#333; font-size:.85rem; }
-  .toc-item:hover{ background:#f1f1f1; }
-  .toc-item.locked{ color:#aaa; }
-  .toc-item .fa-lock{ font-size:.7rem; margin-left:4px; }
+  .toc-item{ display:block; width:100%; text-align:left; background:none; border:0; padding:7px 12px; color:#222; font-size:.86rem; line-height:1.35; }
+  .toc-item:hover{ background:#f4f4f6; }
+  .toc-item.locked{ color:#b3b3b3; }
+  .toc-item .fa-lock{ font-size:.68rem; margin-left:5px; }
+  .toc-item.toc-level-0{ font-weight:700; color:#1a1a1a; margin-top:4px; padding-top:10px; border-top:1px solid #f0f0f0; }
+  .toc-item.toc-level-0:first-child{ border-top:0; margin-top:0; }
+  .toc-item.toc-level-1{ font-weight:400; color:#555; font-size:.82rem; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
@@ -82,8 +85,9 @@
     entries.forEach(entry => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'toc-item' + (entry.locked ? ' locked' : '');
-      btn.style.paddingLeft = (8 + (entry.level || 0) * 14) + 'px';
+      const level = Math.min(entry.level || 0, 1);
+      btn.className = 'toc-item toc-level-' + level + (entry.locked ? ' locked' : '');
+      btn.style.paddingLeft = (12 + level * 16) + 'px';
       btn.innerHTML = entry.title + (entry.locked ? ' <i class="fa-solid fa-lock"></i>' : '');
       btn.addEventListener('click', () => {
         tocPanel.classList.add('d-none');
@@ -195,20 +199,25 @@
       }
     }
 
-    // Neu file PDF co san muc luc/bookmark (outline) thi uu tien dung, chuan xac hon viec do chu
+    // Neu file PDF co san muc luc/bookmark (outline) thi uu tien dung, chuan xac hon viec do chu.
+    // Chi lay toi da 2 cap (chuong + bai/muc con) va bo qua nhung dong qua dai (thuong la loi giai/
+    // dap an bi nhung nham thanh bookmark rat sau trong file goc) de muc luc gon gang, de dung.
+    const MAX_TOC_LEVEL = 1;
+    const MAX_TITLE_LEN = 70;
     try {
       const outline = await pdf.getOutline();
       if (outline && outline.length) {
         tocEntries.length = 0;
         async function flattenOutline(items, level) {
           for (const item of items) {
+            const title = (item.title || '').trim();
             let dest = item.dest;
             if (typeof dest === 'string') dest = await pdf.getDestination(dest);
-            if (dest && dest[0] != null) {
+            if (dest && dest[0] != null && title && title.length <= MAX_TITLE_LEN) {
               const pageIndex = await pdf.getPageIndex(dest[0]);
-              tocEntries.push({ title: item.title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level });
+              tocEntries.push({ title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level });
             }
-            if (item.items && item.items.length) await flattenOutline(item.items, level + 1);
+            if (item.items && item.items.length && level < MAX_TOC_LEVEL) await flattenOutline(item.items, level + 1);
           }
         }
         await flattenOutline(outline, 0);
