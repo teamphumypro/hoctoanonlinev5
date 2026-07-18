@@ -30,5 +30,35 @@ const uploadExamDoc = multer({
     cb(null, ok);
   }
 });
+// File PDF cua sach doc online (kieu lat trang) - chi can 1 file PDF duy nhat, khong tach chuong
+const uploadBookFile = multer({
+  storage: makeStorage('online-books'),
+  limits: { fileSize: 150 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.pdf$/i.test(file.originalname);
+    cb(null, ok);
+  }
+});
 
-module.exports = { uploadAvatar, uploadThumbnail, uploadVideo, uploadFile, uploadExamDoc };
+// Form "Them/Sua sach doc online" gui cung luc anh bia (cover) + file PDF cua sach (book_file)
+// trong 1 multipart/form-data duy nhat -> can 1 multer instance duy nhat, dinh tuyen theo fieldname
+const onlineBookStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const subfolder = file.fieldname === 'book_file' ? 'online-books' : 'thumbnails';
+    const dir = path.join(__dirname, '..', 'public', 'uploads', subfolder);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
+});
+const uploadOnlineBookForm = multer({
+  storage: onlineBookStorage,
+  limits: { fileSize: 150 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'book_file') return cb(null, /\.pdf$/i.test(file.originalname));
+    if (file.fieldname === 'cover') return cb(null, /\.(png|jpe?g|webp|gif)$/i.test(file.originalname));
+    cb(null, false);
+  }
+}).fields([{ name: 'cover', maxCount: 1 }, { name: 'book_file', maxCount: 1 }]);
+
+module.exports = { uploadAvatar, uploadThumbnail, uploadVideo, uploadFile, uploadExamDoc, uploadBookFile, uploadOnlineBookForm };

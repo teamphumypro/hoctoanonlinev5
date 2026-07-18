@@ -13,7 +13,11 @@ const Book = {
   async published(filters = {}) {
     const clauses = ['b.is_published=1'];
     const params = [];
-    if (filters.category_id) { params.push(filters.category_id); clauses.push(`b.category_id=$${params.length}`); }
+    if (filters.category_ids && filters.category_ids.length) {
+      params.push(filters.category_ids); clauses.push(`b.category_id = ANY($${params.length}::int[])`);
+    } else if (filters.category_id) {
+      params.push(filters.category_id); clauses.push(`b.category_id=$${params.length}`);
+    }
     if (filters.book_type_id) { params.push(filters.book_type_id); clauses.push(`b.book_type_id=$${params.length}`); }
     const r = await db.query(`
       SELECT b.*, cat.name AS category_name, bt.name AS book_type_name

@@ -1,91 +1,75 @@
-// Nhan dien cau hoi tu van ban thuan (khong dung AI) - dua tren cac mau de thi tieng Viet pho bien.
-// Day la phan tich "best effort": ket qua luon can nguoi rieng lai qua man hinh xem truoc.
+// Bo phan tich de thi theo mau thuong gap (Cau X: ... A. B. C. D. ... + bang dap an cuoi bai)
+// Day la phuong an du phong mien phi, chay truoc AI. Ket qua chi la GOI Y BAN DAU,
+// nguoi dung luon can xem lai va sua truoc khi luu (do do khong the chinh xac 100%).
 
-function splitIntoQuestionBlocks(text) {
-  // Cat van ban thanh tung khoi theo "Câu N" hoac "Câu N:" hoac "Câu N."
-  const regex = /(?:^|\n)\s*C[aâ]u\s*(\d+)[\.:\)]?\s*/gi;
-  const matches = [...text.matchAll(regex)];
-  if (matches.length === 0) return [];
-
-  const blocks = [];
-  for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].index + matches[i][0].length;
-    const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-    blocks.push({ number: matches[i][1], content: text.slice(start, end).trim() });
-  }
-  return blocks;
+function normalizeText(text) {
+  return text.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').trim();
 }
 
-function parseSingleChoiceOrTrueFalse(block) {
-  // Tim cac dong bat dau bang "A." "B." "C." "D." (hoa, cham) -> trac nghiem 1 dap an
-  const mcLines = [...block.content.matchAll(/(?:^|\n)\s*([A-D])[\.\)]\s*(.+?)(?=\n\s*[A-D][\.\)]|\n\n|$)/gis)];
+// Tim bang dap an dang "1. A  2. C  3-B ..." hoac "Cau 1: A" o cuoi van ban
+function extractAnswerKey(text) {
+  const key = {};
+  const keySectionMatch = text.match(/(đáp\s*án|answer\s*key)[\s\S]{0,3000}$/i);
+  const searchText = keySectionMatch ? keySectionMatch[0] : text;
+  const regex = /(?:câu\s*)?(\d{1,3})[\.\-:\)]\s*([A-D])\b/gi;
+  let m;
+  while ((m = regex.exec(searchText)) !== null) {
+    key[parseInt(m[1])] = m[2].toUpperCase();
+  }
+  return key;
+}
 
-  // Tim cac dong bat dau bang "a)" "b)" "c)" "d)" (thuong, ngoac) -> dung/sai nhieu y
-  const tfLines = [...block.content.matchAll(/(?:^|\n)\s*([a-d])\)\s*(.+?)(?=\n\s*[a-d]\)|\n\n|$)/gs)];
+function parseExamText(rawText, images = []) {
+  const { restoreImages } = require('./extractText');
+  const text = normalizeText(rawText);
+  const answerKey = extractAnswerKey(text);
 
-  if (mcLines.length >= 2) {
-    const questionText = block.content.slice(0, mcLines[0].index).trim();
-    const options = mcLines.map(m => m[2].trim().replace(/\s*\(Đúng\)|\s*\(Sai\)|\s*✓\s*$/i, ''));
-    // Doan dap an dung: tim ky hieu (Đúng)/✓ canh phuong an, hoac "Đáp án: X" trong doan van
-    let correctIndex = mcLines.findIndex(m => /\(Đúng\)|✓/i.test(m[2]));
-    if (correctIndex === -1) {
-      const ansMatch = block.content.match(/Đáp\s*án[:\s]+([A-D])/i);
-      if (ansMatch) correctIndex = 'ABCD'.indexOf(ansMatch[1].toUpperCase());
+  // Tach theo tung "Cau N" hoac "N)" o dau dong
+  const blocks = text.split(/\n(?=(?:Câu|Bài|Question)\s*\d{1,3}[\.\:\)])/i);
+  const questions = [];
+  let qNumber = 0;
+
+  for (const block of blocks) {
+    const headerMatch = block.match(/^(?:Câu|Bài|Question)\s*(\d{1,3})[\.\:\)]\s*/i);
+    if (!headerMatch) continue;
+    qNumber = parseInt(headerMatch[1]);
+    let body = block.slice(headerMatch[0].length).trim();
+
+    // Tim cac phuong an A. B. C. D.
+    const optionRegex = /\n?\s*([A-D])[\.\)]\s*(.+?)(?=\n\s*[A-D][\.\)]|$)/gs;
+    const options = [];
+    let om;
+    while ((om = optionRegex.exec(body)) !== null) {
+      options.push({ letter: om[1].toUpperCase(), text: restoreImages(om[2].trim().replace(/\n+/g, ' '), images) });
     }
-    return {
-      type: 'single_choice',
-      question: questionText || `(Câu ${block.number})`,
-      points: 0.25,
-      options,
-      correctIndex: correctIndex >= 0 ? correctIndex : 0,
-      lowConfidence: correctIndex === -1
-    };
+
+    // Phan noi dung cau hoi la doan truoc phuong an dau tien
+    const firstOptionIdx = body.search(/\n?\s*[A-D][\.\)]\s*/);
+    const questionText = restoreImages((firstOptionIdx > -1 ? body.slice(0, firstOptionIdx) : body).trim().replace(/\n+/g, ' '), images);
+
+    if (options.length >= 2) {
+      const correctLetter = answerKey[qNumber] || null;
+      const correctIndex = correctLetter ? options.findIndex(o => o.letter === correctLetter) : -1;
+      questions.push({
+        type: 'single_choice',
+        question: questionText || `(Câu ${qNumber} — chưa nhận diện được nội dung, vui lòng sửa lại)`,
+        points: 0.25,
+        options: options.map(o => o.text),
+        correctIndex: correctIndex >= 0 ? correctIndex : 0,
+        needsReview: correctIndex < 0 // khong tim thay dap an trong de -> can nguoi dung tu chon lai
+      });
+    } else {
+      // Khong tim thay cau tra loi A/B/C/D -> co the la tu luan / dang khac, dua vao dang "tu luan" de nguoi dung tu phan loai lai
+      questions.push({
+        type: 'essay',
+        question: questionText || restoreImages(body.trim().replace(/\n+/g, ' '), images) || `(Câu ${qNumber} — chưa nhận diện được nội dung)`,
+        points: 1,
+        needsReview: true
+      });
+    }
   }
 
-  if (tfLines.length >= 2) {
-    const questionText = block.content.slice(0, tfLines[0].index).trim();
-    const items = tfLines.map(m => {
-      const raw = m[2].trim();
-      const markedTrue = /\(Đúng\)|✓|\bĐ\b\s*$/i.test(raw);
-      const markedFalse = /\(Sai\)|✗|\bS\b\s*$/i.test(raw);
-      return {
-        content: raw.replace(/\(Đúng\)|\(Sai\)|✓|✗/gi, '').trim(),
-        is_correct: markedTrue && !markedFalse
-      };
-    });
-    return {
-      type: 'true_false',
-      question: questionText || `(Câu ${block.number})`,
-      points: 1,
-      items,
-      lowConfidence: !tfLines.some(m => /\(Đúng\)|\(Sai\)|✓|✗/i.test(m[2]))
-    };
-  }
-
-  // Khong tim thay phuong an -> tra loi ngan (neu ngan) hoac tu luan (neu dai)
-  const ansMatch = block.content.match(/Đáp\s*án[:\s]+(.+)$/im);
-  const questionText = ansMatch ? block.content.slice(0, ansMatch.index).trim() : block.content.trim();
-
-  if (questionText.length > 280 && !ansMatch) {
-    return { type: 'essay', question: questionText, points: 2 };
-  }
-  return {
-    type: 'short_answer',
-    question: questionText,
-    points: 0.25,
-    correct_answer: ansMatch ? ansMatch[1].trim() : '',
-    lowConfidence: !ansMatch
-  };
-}
-
-function parseExamText(rawText) {
-  const text = rawText.replace(/\r\n/g, '\n');
-  const blocks = splitIntoQuestionBlocks(text);
-  if (blocks.length === 0) {
-    return { questions: [], warning: 'Không tìm thấy mẫu "Câu 1, Câu 2..." trong văn bản. Có thể đề dùng định dạng khác — thử chọn chế độ AI hoặc nhập tay.' };
-  }
-  const questions = blocks.map(parseSingleChoiceOrTrueFalse);
-  return { questions, warning: null };
+  return questions;
 }
 
 module.exports = { parseExamText };

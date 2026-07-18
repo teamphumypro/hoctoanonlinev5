@@ -18,9 +18,8 @@ Quy tắc quan trọng:
 - Giữ nguyên số thứ tự và nội dung câu hỏi càng sát bản gốc càng tốt.
 - Chỉ trả về mảng JSON, không thêm bất kỳ chữ nào khác.`;
 
-const { restoreImages } = require('../examImport/extractText');
-
 async function parseWithAI(examText, config, images = []) {
+  const { restoreImages } = require('../examImport/extractText');
   const apiKey = (config.ai_api_key || '').trim();
   if (!apiKey) throw new Error('Chưa cấu hình AI API Key');
   const model = (config.ai_model || 'claude-sonnet-5').trim();

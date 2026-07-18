@@ -1,8 +1,8 @@
 // Tach noi dung sach/truyen thanh tung chuong dua theo cac dau hieu thuong gap
 // (Chuong 1, CHUONG I, Phan 1, Hoi 1...). Day la GOI Y BAN DAU, admin luon can xem lai truoc khi luu.
-const { restoreImages } = require('./extractText');
 
 function textToHtml(text, images = []) {
+  const { restoreImages } = require('./extractText');
   return text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
     .map(p => `<p>${restoreImages(p.replace(/\n/g, '<br>'), images)}</p>`).join('');
 }
