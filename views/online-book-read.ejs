@@ -7,10 +7,20 @@
 </div>
 
 <div class="d-flex justify-content-center mb-3">
-  <div id="flipbook"></div>
+  <div style="position:relative; display:inline-block">
+    <div id="flipbook"></div>
+    <div id="tocPanel" class="d-none" style="position:absolute; top:0; left:0; bottom:0; width:280px; max-width:80vw; background:#fff; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:20; overflow-y:auto; padding:14px;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <b class="small text-uppercase text-muted">Mục lục</b>
+        <button type="button" id="tocCloseBtn" class="btn-close btn-sm" aria-label="Đóng"></button>
+      </div>
+      <div id="tocList" class="small text-muted">Đang nhận diện mục lục...</div>
+    </div>
+  </div>
 </div>
 
 <div class="d-flex justify-content-center gap-2 mb-4">
+  <button id="tocToggleBtn" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-list"></i> Mục lục</button>
   <button id="prevBtn" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Trang trước</button>
   <button id="nextBtn" class="btn btn-outline-secondary btn-sm">Trang sau <i class="fa-solid fa-arrow-right"></i></button>
 </div>
@@ -47,9 +57,43 @@
   .storypage-inner{ padding:24px; height:100%; overflow-y:auto; font-size:.95rem; line-height:1.7; }
   .storypage.pdfpage{ display:flex; align-items:center; justify-content:center; background:#fff; }
   .storypage.pdfpage canvas{ max-width:100%; max-height:100%; }
+  .toc-item{ display:block; width:100%; text-align:left; background:none; border:0; padding:6px 8px; border-radius:6px; color:#333; font-size:.85rem; }
+  .toc-item:hover{ background:#f1f1f1; }
+  .toc-item.locked{ color:#aaa; }
+  .toc-item .fa-lock{ font-size:.7rem; margin-left:4px; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+
+<script>
+  // Dung chung cho ca 2 che do doc (pdf / chapters): dieu khien mo/dong bang muc luc
+  const tocPanel = document.getElementById('tocPanel');
+  document.getElementById('tocToggleBtn').addEventListener('click', () => tocPanel.classList.toggle('d-none'));
+  document.getElementById('tocCloseBtn').addEventListener('click', () => tocPanel.classList.add('d-none'));
+
+  // entries: [{ title, pageIndex, locked, level }]
+  function renderTocList(entries, onJump, buySlug) {
+    const listEl = document.getElementById('tocList');
+    if (!entries.length) {
+      listEl.innerHTML = '<div class="text-muted">Không nhận diện được mục lục cho sách này.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    entries.forEach(entry => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toc-item' + (entry.locked ? ' locked' : '');
+      btn.style.paddingLeft = (8 + (entry.level || 0) * 14) + 'px';
+      btn.innerHTML = entry.title + (entry.locked ? ' <i class="fa-solid fa-lock"></i>' : '');
+      btn.addEventListener('click', () => {
+        tocPanel.classList.add('d-none');
+        if (entry.locked) { window.location.href = buySlug; return; }
+        onJump(entry.pageIndex);
+      });
+      listEl.appendChild(btn);
+    });
+  }
+</script>
 
 <% if (mode === 'chapters') { %>
 <script>
@@ -68,6 +112,10 @@
 
   document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
   document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
+
+  // Muc luc lay thang tu danh sach chuong da co san (khong can tu nhan dien)
+  const chapterEntries = <%- JSON.stringify(chapters.map((c, i) => ({ title: 'Chương ' + (i + 1) + ': ' + c.title, pageIndex: i, locked: !c.unlocked }))) %>;
+  renderTocList(chapterEntries, (i) => pageFlip.flip(i), '/doc-sach-online/<%= book.slug %>');
 </script>
 <% } else { %>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -82,6 +130,23 @@
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+  // Nhan dien tieu de chuong trong van ban 1 trang (dung chung dau hieu voi bo tach chuong tu file Word/PDF)
+  const chapterHeadingRegex = /^(Chương|CHƯƠNG|Phần|PHẦN|Hồi|HỒI)\s+[\dIVXLCM]+[\.\:\-\s]?.{0,80}$/;
+  function findHeadingOnPage(textItems) {
+    // Chi xet vai dong dau trang (tieu de chuong thuong nam tren cung)
+    const lines = [];
+    let current = '';
+    for (const it of textItems) {
+      current += it.str;
+      if (it.hasEOL) { lines.push(current.trim()); current = ''; if (lines.length >= 6) break; }
+    }
+    if (current.trim()) lines.push(current.trim());
+    for (const line of lines.slice(0, 6)) {
+      if (line.length > 2 && line.length < 90 && chapterHeadingRegex.test(line)) return line;
+    }
+    return null;
+  }
+
   try {
     const loadingTask = pdfjsLib.getDocument('/doc-sach-online/' + bookSlug + '/file');
     const pdf = await loadingTask.promise;
@@ -93,6 +158,7 @@
     container.style.display = 'none';
 
     const targetWidth = isMobile ? 320 : 420;
+    const tocEntries = [];
     for (let i = 1; i <= pagesToRender; i++) {
       const page = await pdf.getPage(i);
       const baseViewport = page.getViewport({ scale: 1 });
@@ -108,7 +174,46 @@
       pageDiv.setAttribute('data-density', (i === 1 || i === pagesToRender) ? 'hard' : 'soft');
       pageDiv.appendChild(canvas);
       container.appendChild(pageDiv);
+
+      try {
+        const textContent = await page.getTextContent();
+        const heading = findHeadingOnPage(textContent.items);
+        if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: false, level: 0 });
+      } catch (e) { /* khong sao neu trang khong doc duoc text (anh scan...) */ }
     }
+
+    // Neu con trang bi khoa (chua mua), quet tiep phan text (khong render anh) de muc luc van day du,
+    // cac chuong sau diem khoa se hien kem bieu tuong khoa, bam vao se dan toi trang mua sach
+    if (!unlocked && totalPages > pagesToRender) {
+      for (let i = pagesToRender + 1; i <= totalPages; i++) {
+        try {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const heading = findHeadingOnPage(textContent.items);
+          if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: true, level: 0 });
+        } catch (e) { /* bo qua */ }
+      }
+    }
+
+    // Neu file PDF co san muc luc/bookmark (outline) thi uu tien dung, chuan xac hon viec do chu
+    try {
+      const outline = await pdf.getOutline();
+      if (outline && outline.length) {
+        tocEntries.length = 0;
+        async function flattenOutline(items, level) {
+          for (const item of items) {
+            let dest = item.dest;
+            if (typeof dest === 'string') dest = await pdf.getDestination(dest);
+            if (dest && dest[0] != null) {
+              const pageIndex = await pdf.getPageIndex(dest[0]);
+              tocEntries.push({ title: item.title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level });
+            }
+            if (item.items && item.items.length) await flattenOutline(item.items, level + 1);
+          }
+        }
+        await flattenOutline(outline, 0);
+      }
+    } catch (e) { /* khong co outline thi thoi, dung ket qua tu nhan dien van ban o tren */ }
 
     if (!unlocked && totalPages > previewLimit) {
       const lockDiv = document.createElement('div');
@@ -136,6 +241,8 @@
 
     document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
     document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
+
+    renderTocList(tocEntries, (i) => pageFlip.flip(i), buySlug);
   } catch (err) {
     console.error('Loi tai sach PDF:', err);
     loadingEl.innerHTML = '<div class="text-danger">Không tải được sách. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.</div>';
