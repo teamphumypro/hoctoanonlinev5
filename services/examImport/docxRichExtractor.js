@@ -29,7 +29,7 @@ async function extractDocxRich(filePath) {
     }
   }
 
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', preserveOrder: true });
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', preserveOrder: true, trimValues: false });
   const parsedDoc = parser.parse(documentXml);
 
   const images = [];
