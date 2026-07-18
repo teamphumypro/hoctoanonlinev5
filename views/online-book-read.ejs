@@ -7,7 +7,7 @@
 </div>
 
 <div class="d-flex justify-content-center mb-3">
-  <div style="position:relative; display:inline-block">
+  <div class="flipbook-wrapper">
     <div id="flipbook"></div>
     <div id="tocPanel" class="d-none" style="position:absolute; top:0; left:0; bottom:0; width:300px; max-width:85vw; background:#fff; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:20; overflow-y:auto; padding:0;">
       <div class="d-flex justify-content-between align-items-center px-3 py-2" style="border-bottom:1px solid #eee; position:sticky; top:0; background:#fff;">
@@ -52,11 +52,12 @@
 <% } %>
 
 <style>
-  #flipbook{ box-shadow:0 10px 30px rgba(0,0,0,.2); }
+  .flipbook-wrapper{ position:relative; width:100%; max-width:1100px; margin:0 auto; }
+  #flipbook{ box-shadow:0 10px 30px rgba(0,0,0,.2); width:100%; margin:0 auto; }
   .storypage{ background:#fdfaf3; width:100%; height:100%; overflow:hidden; }
   .storypage-inner{ padding:24px; height:100%; overflow-y:auto; font-size:.95rem; line-height:1.7; }
   .storypage.pdfpage{ display:flex; align-items:center; justify-content:center; background:#fff; }
-  .storypage.pdfpage canvas{ max-width:100%; max-height:100%; }
+  .storypage.pdfpage canvas{ width:100%; height:100%; display:block; }
   .toc-item{ display:block; width:100%; text-align:left; background:none; border:0; padding:7px 12px; color:#222; font-size:.86rem; line-height:1.35; }
   .toc-item:hover{ background:#f4f4f6; }
   .toc-item.locked{ color:#b3b3b3; }
@@ -97,18 +98,33 @@
       listEl.appendChild(btn);
     });
   }
+
+  // Tinh kich thuoc khung doc theo dung khong gian man hinh thuc te, giu dung ty le
+  // (aspectRatio = chieu cao / chieu rong that cua trang). Duoc dung chung cho ca 2 che do doc.
+  function computeFlipSize(aspectRatio) {
+    const wrapperTop = document.querySelector('.flipbook-wrapper').getBoundingClientRect().top;
+    const controlsAndMargins = 170; // khong gian danh cho nut dieu khien + le duoi trang
+    const availW = Math.min(window.innerWidth - 32, 1100);
+    const availH = Math.max(window.innerHeight - wrapperTop - controlsAndMargins, 380);
+    let width = availW;
+    let height = width * aspectRatio;
+    if (height > availH) { height = availH; width = height / aspectRatio; }
+    width = Math.max(280, Math.round(width));
+    height = Math.max(360, Math.round(height));
+    return { width, height };
+  }
 </script>
 
 <% if (mode === 'chapters') { %>
 <script>
   const pageEls = document.querySelectorAll('#pageSource .storypage');
   const flipbookEl = document.getElementById('flipbook');
-  const isMobile = window.innerWidth < 700;
+  const { width: cWidth, height: cHeight } = computeFlipSize(1.42); // ty le trang sach pho thong (~A4 doc)
   const pageFlip = new St.PageFlip(flipbookEl, {
-    width: isMobile ? 320 : 420,
-    height: isMobile ? 460 : 600,
+    width: cWidth,
+    height: cHeight,
     size: 'stretch',
-    minWidth: 280, maxWidth: 600, minHeight: 400, maxHeight: 820,
+    minWidth: 280, maxWidth: 1100, minHeight: 380, maxHeight: 1500,
     showCover: true,
     maxShadowOpacity: 0.5
   });
@@ -116,6 +132,14 @@
 
   document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
   document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
+
+  // che do 'stretch' tu dong co giam theo chieu rong khung cha (.flipbook-wrapper, von
+  // da co width theo % man hinh) - o day chi can bao no ve lai trang hien tai cho khop.
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => pageFlip.update(), 200);
+  });
 
   // Muc luc lay thang tu danh sach chuong da co san (khong can tu nhan dien)
   const chapterEntries = <%- JSON.stringify(chapters.map((c, i) => ({ title: 'Chương ' + (i + 1) + ': ' + c.title, pageIndex: i, locked: !c.unlocked }))) %>;
@@ -127,7 +151,6 @@
 (async function () {
   const flipbookEl = document.getElementById('flipbook');
   const loadingEl = document.getElementById('pdfLoading');
-  const isMobile = window.innerWidth < 700;
   const unlocked = <%- unlocked ? 'true' : 'false' %>;
   const bookSlug = <%- JSON.stringify(book.slug) %>;
   const buySlug = '/doc-sach-online/' + bookSlug;
@@ -161,7 +184,11 @@
     const container = document.createElement('div');
     container.style.display = 'none';
 
-    const targetWidth = isMobile ? 320 : 420;
+    // Lay ty le that (cao/rong) tu chinh trang PDF dau tien, roi tinh kich thuoc khung doc
+    // vua khit man hinh hien tai (khong con bi gioi han o muc 420x600 nhu truoc).
+    const firstPageViewport = (await pdf.getPage(1)).getViewport({ scale: 1 });
+    const pdfAspectRatio = firstPageViewport.height / firstPageViewport.width;
+    const { width: targetWidth, height: targetHeight } = computeFlipSize(pdfAspectRatio);
     const tocEntries = [];
     for (let i = 1; i <= pagesToRender; i++) {
       const page = await pdf.getPage(i);
@@ -240,9 +267,9 @@
 
     const pageFlip = new St.PageFlip(flipbookEl, {
       width: targetWidth,
-      height: isMobile ? 460 : 600,
+      height: targetHeight,
       size: 'stretch',
-      minWidth: 280, maxWidth: 600, minHeight: 400, maxHeight: 820,
+      minWidth: 280, maxWidth: 1100, minHeight: 380, maxHeight: 1500,
       showCover: true,
       maxShadowOpacity: 0.5
     });
@@ -250,6 +277,12 @@
 
     document.getElementById('prevBtn').addEventListener('click', () => pageFlip.flipPrev());
     document.getElementById('nextBtn').addEventListener('click', () => pageFlip.flipNext());
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => pageFlip.update(), 200);
+    });
 
     renderTocList(tocEntries, (i) => pageFlip.flip(i), buySlug);
   } catch (err) {
