@@ -1,9 +1,9 @@
 <% var pageTitle = 'Sửa chương' %>
 <%- include('../../partials/admin-header') %>
-<div class="mb-3"><a href="/admin/sach/<%= book.id %>/chuong" class="btn btn-outline-secondary btn-sm">← Quay lại danh sách chương</a></div>
+<div class="mb-3"><a href="/admin/doc-sach-online/<%= book.id %>/chuong" class="btn btn-outline-secondary btn-sm">← Quay lại danh sách chương</a></div>
 <div class="card p-4" style="max-width:800px">
-  <form method="POST" action="/admin/sach-chuong/<%= chapter.id %>">
-    <input type="hidden" name="book_id" value="<%= book.id %>">
+  <form method="POST" action="/admin/doc-sach-online-chuong/<%= chapter.id %>">
+    <input type="hidden" name="online_book_id" value="<%= book.id %>">
     <div class="mb-3"><label class="form-label">Tên chương</label>
       <input name="title" class="form-control" value="<%= chapter.title %>" required></div>
     <div class="mb-3"><label class="form-label">Nội dung</label>

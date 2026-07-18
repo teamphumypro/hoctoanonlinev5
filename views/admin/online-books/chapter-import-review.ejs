@@ -6,11 +6,11 @@
     <h6 class="fw-bold mb-0">Xem trước & sửa trước khi lưu</h6>
     <div class="small text-muted">Nhận diện được <strong><%= chapters.length %></strong> chương. Sửa tiêu đề/nội dung, hoặc bỏ tick "Giữ chương này" nếu tách sai.</div>
   </div>
-  <a href="/admin/sach/<%= book.id %>/chuong" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
+  <a href="/admin/doc-sach-online/<%= book.id %>/chuong" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
 </div>
 
-<form method="POST" action="/admin/sach-chuong/nhap-tu-file/luu">
-  <input type="hidden" name="book_id" value="<%= book.id %>">
+<form method="POST" action="/admin/doc-sach-online-chuong/nhap-tu-file/luu">
+  <input type="hidden" name="online_book_id" value="<%= book.id %>">
 
   <% chapters.forEach((c, i) => { %>
     <div class="card p-3 mb-3">
@@ -37,5 +37,4 @@
     <button class="btn btn-primary">Lưu tất cả chương đã chọn</button>
   <% } %>
 </form>
-
 <%- include('../../partials/admin-footer') %>

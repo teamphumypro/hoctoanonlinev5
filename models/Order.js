@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const Enrollment = require('./Enrollment');
 const BookPurchase = require('./BookPurchase');
+const OnlineBookPurchase = require('./OnlineBookPurchase');
 
 const Order = {
   async findById(id) {
@@ -54,6 +55,7 @@ const Order = {
     for (const item of items) {
       if (item.item_type === 'course') await Enrollment.create(order.user_id, item.item_id);
       else if (item.item_type === 'book') await BookPurchase.grant(order.user_id, item.item_id);
+      else if (item.item_type === 'online_book') await OnlineBookPurchase.grant(order.user_id, item.item_id);
     }
   },
 

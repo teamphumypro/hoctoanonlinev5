@@ -14,6 +14,7 @@ const adminQuizController = require('../controllers/adminQuizController');
 const adminExamImportController = require('../controllers/adminExamImportController');
 const adminAiSettingsController = require('../controllers/adminAiSettingsController');
 const adminBookController = require('../controllers/adminBookController');
+const adminOnlineBookController = require('../controllers/adminOnlineBookController');
 
 const { requireAdminLogin, requireRole } = require('../middleware/auth');
 const { uploadThumbnail, uploadVideo, uploadFile, uploadExamDoc } = require('../middleware/upload');
@@ -49,8 +50,7 @@ router.get('/khoa-hoc/:id/sua', requireRole('teacher'), courseController.editFor
 router.post('/khoa-hoc/:id', requireRole('teacher'), uploadThumbnail.single('thumbnail'), courseController.update);
 router.post('/khoa-hoc/:id/xoa', requireRole('admin'), courseController.delete);
 
-// ---- Sach ----
-router.get('/doc-sach-online', requireRole('teacher'), adminBookController.onlineReadingList);
+// ---- Sach (ban/tai file) - KHONG con chuc nang doc chuong nua, tach rieng sang Doc sach online ----
 router.get('/sach/danh-muc', requireRole('admin'), adminBookController.categories);
 router.get('/sach/danh-muc/them-moi', requireRole('admin'), adminBookController.categoryNewForm);
 router.post('/sach/danh-muc', requireRole('admin'), adminBookController.categoryCreate);
@@ -68,25 +68,33 @@ router.get('/sach/:id/sua', requireRole('teacher'), adminBookController.editForm
 router.post('/sach/:id', requireRole('teacher'), uploadThumbnail.single('cover'), adminBookController.update);
 router.post('/sach/:id/xoa', requireRole('admin'), adminBookController.delete);
 
-router.get('/sach/:id/chuong', requireRole('teacher'), adminBookController.chapters);
-router.get('/sach/:id/chuong/nhap-tu-file', requireRole('teacher'), adminBookController.chapterImportForm);
-router.post('/sach/:id/chuong/nhap-tu-file', requireRole('teacher'), (req, res, next) => {
+// ---- Doc sach online (TACH RIENG HOAN TOAN voi Sach) ----
+router.get('/doc-sach-online', requireRole('teacher'), adminOnlineBookController.list);
+router.get('/doc-sach-online/them-moi', requireRole('teacher'), adminOnlineBookController.newForm);
+router.post('/doc-sach-online', requireRole('teacher'), uploadThumbnail.single('cover'), adminOnlineBookController.create);
+router.get('/doc-sach-online/:id/sua', requireRole('teacher'), adminOnlineBookController.editForm);
+router.post('/doc-sach-online/:id', requireRole('teacher'), uploadThumbnail.single('cover'), adminOnlineBookController.update);
+router.post('/doc-sach-online/:id/xoa', requireRole('admin'), adminOnlineBookController.delete);
+
+router.get('/doc-sach-online/:id/chuong', requireRole('teacher'), adminOnlineBookController.chapters);
+router.get('/doc-sach-online/:id/chuong/nhap-tu-file', requireRole('teacher'), adminOnlineBookController.chapterImportForm);
+router.post('/doc-sach-online/:id/chuong/nhap-tu-file', requireRole('teacher'), (req, res, next) => {
   uploadExamDoc.single('exam_file')(req, res, (err) => {
     if (err) {
-      console.error('Loi upload file sach:', err);
+      console.error('Loi upload file sach doc online:', err);
       return res.status(400).send(
         `<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">Lỗi khi tải file lên: ${err.message}</pre>`
       );
     }
     next();
   });
-}, adminBookController.chapterImport);
-router.post('/sach-chuong/nhap-tu-file/luu', requireRole('teacher'), adminBookController.chapterImportSave);
-router.post('/sach-chuong', requireRole('teacher'), adminBookController.chapterCreate);
-router.get('/sach-chuong/:id/sua', requireRole('teacher'), adminBookController.chapterEditForm);
-router.post('/sach-chuong/sap-xep', requireRole('teacher'), adminBookController.chapterReorder);
-router.post('/sach-chuong/:id', requireRole('teacher'), adminBookController.chapterUpdate);
-router.post('/sach-chuong/:id/xoa', requireRole('teacher'), adminBookController.chapterDelete);
+}, adminOnlineBookController.chapterImport);
+router.post('/doc-sach-online-chuong/nhap-tu-file/luu', requireRole('teacher'), adminOnlineBookController.chapterImportSave);
+router.post('/doc-sach-online-chuong', requireRole('teacher'), adminOnlineBookController.chapterCreate);
+router.get('/doc-sach-online-chuong/:id/sua', requireRole('teacher'), adminOnlineBookController.chapterEditForm);
+router.post('/doc-sach-online-chuong/sap-xep', requireRole('teacher'), adminOnlineBookController.chapterReorder);
+router.post('/doc-sach-online-chuong/:id', requireRole('teacher'), adminOnlineBookController.chapterUpdate);
+router.post('/doc-sach-online-chuong/:id/xoa', requireRole('teacher'), adminOnlineBookController.chapterDelete);
 
 // ---- Noi dung khoa hoc: Chuong > Bai > Video/File ----
 router.get('/khoa-hoc/:id/noi-dung', courseController.contentPage);

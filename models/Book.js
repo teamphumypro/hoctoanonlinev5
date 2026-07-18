@@ -63,29 +63,6 @@ const Book = {
   async count() {
     const r = await db.query('SELECT COUNT(*) c FROM books');
     return parseInt(r.rows[0].c);
-  },
-  // Sach co bat tinh nang doc online (co it nhat 1 chuong)
-  async withChaptersAll() {
-    const r = await db.query(`
-      SELECT b.*, cat.name AS category_name, bt.name AS book_type_name,
-        (SELECT COUNT(*) FROM book_chapters WHERE book_id=b.id) AS chapter_count
-      FROM books b
-      LEFT JOIN categories cat ON cat.id = b.category_id
-      LEFT JOIN book_types bt ON bt.id = b.book_type_id
-      WHERE EXISTS (SELECT 1 FROM book_chapters WHERE book_id=b.id)
-      ORDER BY b.created_at DESC`);
-    return r.rows;
-  },
-  async withChaptersPublished() {
-    const r = await db.query(`
-      SELECT b.*, cat.name AS category_name, bt.name AS book_type_name,
-        (SELECT COUNT(*) FROM book_chapters WHERE book_id=b.id) AS chapter_count
-      FROM books b
-      LEFT JOIN categories cat ON cat.id = b.category_id
-      LEFT JOIN book_types bt ON bt.id = b.book_type_id
-      WHERE b.is_published=1 AND EXISTS (SELECT 1 FROM book_chapters WHERE book_id=b.id)
-      ORDER BY b.created_at DESC`);
-    return r.rows;
   }
 };
 module.exports = Book;

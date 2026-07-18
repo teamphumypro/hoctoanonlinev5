@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const Course = require('./Course');
 const Book = require('./Book');
+const OnlineBook = require('./OnlineBook');
 
 const Cart = {
   async add(user_id, item_type, item_id) {
@@ -30,6 +31,9 @@ const Cart = {
       } else if (row.item_type === 'book') {
         const b = await Book.findById(row.item_id);
         if (b) items.push({ item_type: 'book', item_id: b.id, title: b.title, price: b.price, image: b.cover_url, slug: b.slug });
+      } else if (row.item_type === 'online_book') {
+        const ob = await OnlineBook.findById(row.item_id);
+        if (ob) items.push({ item_type: 'online_book', item_id: ob.id, title: ob.title, price: ob.price, image: ob.cover_url, slug: ob.slug });
       }
     }
     return items;

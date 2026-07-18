@@ -365,6 +365,48 @@ BEGIN
 END $$;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_birth_year INTEGER;
 
+-- ---------- BO SUNG: "Doc sach online" TACH BIET HOAN TOAN voi "Sach" (ban/tai file) ----------
+CREATE TABLE IF NOT EXISTS online_books (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  author TEXT,
+  short_desc TEXT,
+  description TEXT,
+  cover_url TEXT,
+  price INTEGER NOT NULL DEFAULT 0,
+  compare_at_price INTEGER,
+  is_published INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS online_book_chapters (
+  id SERIAL PRIMARY KEY,
+  online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT,
+  is_free INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS online_book_purchases (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,
+  purchased_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, online_book_id)
+);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'cart_items_item_type_check') THEN
+    ALTER TABLE cart_items DROP CONSTRAINT cart_items_item_type_check;
+  END IF;
+  ALTER TABLE cart_items ADD CONSTRAINT cart_items_item_type_check CHECK (item_type IN ('course','book','online_book'));
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'order_items_item_type_check') THEN
+    ALTER TABLE order_items DROP CONSTRAINT order_items_item_type_check;
+  END IF;
+  ALTER TABLE order_items ADD CONSTRAINT order_items_item_type_check CHECK (item_type IN ('course','book','online_book'));
+END $$;
+
 -- ---------- BO SUNG: "Thuc chien phong thi" - de thi doc lap khong gan voi bai hoc nao ----------
 ALTER TABLE quizzes ALTER COLUMN lesson_id DROP NOT NULL;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;

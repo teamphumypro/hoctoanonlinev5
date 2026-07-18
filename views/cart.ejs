@@ -14,7 +14,7 @@
         <div class="d-flex align-items-center gap-3">
           <img src="<%= i.image || '/img/placeholder.svg' %>" style="width:70px;height:50px;object-fit:cover;border-radius:6px">
           <div>
-            <div class="fw-semibold"><%= i.item_type === 'book' ? '📘' : '🎓' %> <%= i.title %></div>
+            <div class="fw-semibold"><%= i.item_type === 'book' ? '📘' : i.item_type === 'online_book' ? '📖' : '🎓' %> <%= i.title %></div>
             <div class="price-tag"><%= formatVND(i.price) %></div>
           </div>
         </div>

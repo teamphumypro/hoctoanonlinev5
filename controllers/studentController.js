@@ -100,6 +100,13 @@ exports.myBooks = async (req, res) => {
   res.render('student/my-books', { books });
 };
 
+// Sach doc online da mua
+exports.myOnlineBooks = async (req, res) => {
+  const OnlineBookPurchase = require('../models/OnlineBookPurchase');
+  const books = await OnlineBookPurchase.byUser(req.session.user.id);
+  res.render('student/my-online-books', { books });
+};
+
 // Chung chi: xem + xac thuc qua QR
 exports.myCertificates = async (req, res) => {
   const certs = await Certificate.byUser(req.session.user.id);

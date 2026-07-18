@@ -15,6 +15,7 @@ router.get('/tai-khoan/doi-mat-khau', requireLogin, studentController.showChange
 router.post('/tai-khoan/doi-mat-khau', requireLogin, studentController.changePassword);
 router.get('/tai-khoan/chung-chi', requireLogin, studentController.myCertificates);
 router.get('/tai-khoan/tu-sach', requireLogin, studentController.myBooks);
+router.get('/tai-khoan/doc-sach-online-da-mua', requireLogin, studentController.myOnlineBooks);
 
 router.get('/kich-hoat', requireLogin, studentController.redeemForm);
 router.post('/kich-hoat', requireLogin, studentController.redeem);
@@ -30,6 +31,7 @@ router.post('/gio-hang/them', requireLogin, cartController.add);
 router.post('/gio-hang/xoa', requireLogin, cartController.remove);
 router.get('/mua-ngay/khoa-hoc/:slug', requireLogin, cartController.buyCourseNow);
 router.get('/mua-ngay/sach/:slug', requireLogin, cartController.buyBookNow);
+router.get('/mua-ngay/doc-sach-online/:slug', requireLogin, cartController.buyOnlineBookNow);
 
 router.get('/thanh-toan', requireLogin, checkoutController.checkoutForm);
 router.post('/thanh-toan', requireLogin, checkoutController.createOrder);

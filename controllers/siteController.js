@@ -67,37 +67,47 @@ exports.bookDetail = async (req, res) => {
   if (!book) return res.status(404).render('404');
   let purchased = false;
   if (req.session.user) purchased = await BookPurchase.isPurchased(req.session.user.id, book.id);
-  const BookChapter = require('../models/BookChapter');
-  const chapters = await BookChapter.byBook(book.id);
-  res.render('book-detail', { book, purchased, chapters });
+  res.render('book-detail', { book, purchased });
+};
+
+exports.onlineReadingBooks = async (req, res) => {
+  const OnlineBook = require('../models/OnlineBook');
+  const books = await OnlineBook.published();
+  res.render('online-reading-books', { books });
+};
+
+exports.onlineBookDetail = async (req, res) => {
+  const OnlineBook = require('../models/OnlineBook');
+  const OnlineBookChapter = require('../models/OnlineBookChapter');
+  const OnlineBookPurchase = require('../models/OnlineBookPurchase');
+  const book = await OnlineBook.findBySlug(req.params.slug);
+  if (!book) return res.status(404).render('404');
+  const chapters = await OnlineBookChapter.byBook(book.id);
+  let purchased = false;
+  if (req.session.user) purchased = await OnlineBookPurchase.isPurchased(req.session.user.id, book.id);
+  res.render('online-book-detail', { book, chapters, purchased });
 };
 
 // Trang doc sach online kieu "sach lat": tai toan bo chuong vao 1 cuon sach lat,
 // chuong chua duoc mo khoa (chua mua & khong phai chuong doc thu) se hien trang khoa thay vi noi dung that
-exports.bookRead = async (req, res) => {
-  const Book = require('../models/Book');
-  const BookPurchase = require('../models/BookPurchase');
-  const BookChapter = require('../models/BookChapter');
-  const book = await Book.findBySlug(req.params.slug);
+exports.onlineBookRead = async (req, res) => {
+  const OnlineBook = require('../models/OnlineBook');
+  const OnlineBookChapter = require('../models/OnlineBookChapter');
+  const OnlineBookPurchase = require('../models/OnlineBookPurchase');
+  const book = await OnlineBook.findBySlug(req.params.slug);
   if (!book) return res.status(404).render('404');
-  const chapters = await BookChapter.byBook(book.id);
-  if (chapters.length === 0) return res.redirect(`/sach/${book.slug}`);
+  const chapters = await OnlineBookChapter.byBook(book.id);
+  if (chapters.length === 0) return res.redirect(`/doc-sach-online/${book.slug}`);
 
   let purchased = false;
-  if (req.session.user) purchased = await BookPurchase.isPurchased(req.session.user.id, book.id);
+  if (req.session.user) purchased = await OnlineBookPurchase.isPurchased(req.session.user.id, book.id);
 
   const unlockedChapters = chapters.map(c => ({
     ...c,
     unlocked: book.price === 0 || c.is_free === 1 || purchased
   }));
 
-  res.render('book-read', { book, chapters: unlockedChapters, purchased });
-};
-
-exports.onlineReadingBooks = async (req, res) => {
-  const Book = require('../models/Book');
-  const books = await Book.withChaptersPublished();
-  res.render('online-reading-books', { books });
+  res.render('online-book-read', { book, chapters: unlockedChapters, purchased });
 };
 
 exports.newsList = async (req, res) => {

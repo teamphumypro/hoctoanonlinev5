@@ -1,15 +1,14 @@
-<% var pageTitle = 'Chương đọc online: ' + book.title %>
+<% var pageTitle = 'Chương: ' + book.title %>
 <%- include('../../partials/admin-header') %>
 <div class="mb-3 d-flex justify-content-between">
-  <a href="/admin/sach" class="btn btn-outline-secondary btn-sm">← Quay lại danh sách Sách</a>
-  <a href="/admin/sach/<%= book.id %>/chuong/nhap-tu-file" class="btn btn-outline-success btn-sm">📄 Nhập nội dung từ file/link</a>
+  <a href="/admin/doc-sach-online" class="btn btn-outline-secondary btn-sm">← Quay lại danh sách</a>
+  <a href="/admin/doc-sach-online/<%= book.id %>/chuong/nhap-tu-file" class="btn btn-outline-success btn-sm">📄 Nhập nội dung từ file/link</a>
 </div>
-<div class="alert alert-secondary small">Thêm chương để cho phép đọc cuốn sách này trực tiếp trên web (kiểu lật trang), song song với việc tải file (nếu có).</div>
 
 <div class="card p-3 mb-3">
-  <h6 class="fw-bold mb-2">Thêm chương mới</h6>
-  <form method="POST" action="/admin/sach-chuong">
-    <input type="hidden" name="book_id" value="<%= book.id %>">
+  <h6 class="fw-bold mb-2">Thêm chương mới (gõ tay)</h6>
+  <form method="POST" action="/admin/doc-sach-online-chuong">
+    <input type="hidden" name="online_book_id" value="<%= book.id %>">
     <div class="mb-2"><input name="title" class="form-control" placeholder="Tên chương (vd: Chương 1)" required></div>
     <div class="mb-2"><textarea name="content" class="form-control" rows="6" placeholder="Nội dung chương..."></textarea></div>
     <% if (book.price > 0) { %>
@@ -31,15 +30,15 @@
           <% if (c.is_free) { %><span class="badge bg-success ms-1">Đọc thử</span><% } %>
         </span>
         <span>
-          <a href="/admin/sach-chuong/<%= c.id %>/sua" class="btn btn-sm btn-outline-secondary">Sửa</a>
-          <form method="POST" action="/admin/sach-chuong/<%= c.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa chương này?')">
-            <input type="hidden" name="book_id" value="<%= book.id %>">
+          <a href="/admin/doc-sach-online-chuong/<%= c.id %>/sua" class="btn btn-sm btn-outline-secondary">Sửa</a>
+          <form method="POST" action="/admin/doc-sach-online-chuong/<%= c.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa chương này?')">
+            <input type="hidden" name="online_book_id" value="<%= book.id %>">
             <button class="btn btn-sm btn-outline-danger">Xóa</button>
           </form>
         </span>
       </li>
     <% }) %>
-    <% if (chapters.length === 0) { %><li class="list-group-item text-muted">Chưa có chương nào — sách này chỉ dùng để tải file (nếu có link file).</li><% } %>
+    <% if (chapters.length === 0) { %><li class="list-group-item text-muted">Chưa có chương nào.</li><% } %>
   </ul>
 </div>
 
@@ -49,7 +48,7 @@ new Sortable(document.getElementById('chapterList'), {
   handle: '.drag-handle', animation: 150,
   onEnd: () => {
     const ids = [...document.querySelectorAll('#chapterList > li')].map(el => el.dataset.id).filter(Boolean);
-    fetch('/admin/sach-chuong/sap-xep', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids }) });
+    fetch('/admin/doc-sach-online-chuong/sap-xep', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ids }) });
   }
 });
 </script>

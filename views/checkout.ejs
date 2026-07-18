@@ -7,7 +7,7 @@
       <ul class="list-group list-group-flush mb-3">
         <% items.forEach(i => { %>
           <li class="list-group-item d-flex justify-content-between px-0">
-            <span><%= i.item_type === 'book' ? '📘' : '🎓' %> <%= i.title %></span>
+            <span><%= i.item_type === 'book' ? '📘' : i.item_type === 'online_book' ? '📖' : '🎓' %> <%= i.title %></span>
             <span class="fw-semibold"><%= formatVND(i.price) %></span>
           </li>
         <% }) %>

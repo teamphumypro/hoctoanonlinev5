@@ -20,7 +20,6 @@
           <td><%= formatVND(b.price) %></td>
           <td><span class="badge bg-<%= b.is_published ? 'success' : 'secondary' %>"><%= b.is_published ? 'Hiển thị' : 'Ẩn' %></span></td>
           <td class="text-nowrap">
-            <a href="/admin/sach/<%= b.id %>/chuong" class="btn btn-sm btn-outline-primary">Chương</a>
             <a href="/admin/sach/<%= b.id %>/sua" class="btn btn-sm btn-outline-secondary">Sửa</a>
             <form method="POST" action="/admin/sach/<%= b.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa sách này?')">
               <button class="btn btn-sm btn-outline-danger">Xóa</button>
