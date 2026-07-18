@@ -107,7 +107,9 @@ exports.onlineBookRead = async (req, res) => {
   const unlocked = book.price === 0 || purchased;
 
   if (book.file_url) {
-    return res.render('online-book-read', { book, mode: 'pdf', unlocked, purchased, chapters: [] });
+    const OnlineBookTocEntry = require('../models/OnlineBookTocEntry');
+    const manualToc = await OnlineBookTocEntry.byBook(book.id);
+    return res.render('online-book-read', { book, mode: 'pdf', unlocked, purchased, chapters: [], manualToc });
   }
 
   const chapters = await OnlineBookChapter.byBook(book.id);

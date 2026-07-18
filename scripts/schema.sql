@@ -391,6 +391,17 @@ CREATE TABLE IF NOT EXISTS online_book_chapters (
   position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+-- BO SUNG: muc luc go tay (tieu de + so trang) cho sach doc online kieu 1 file PDF,
+-- de nguoi doc bam vao la nhay thang toi dung trang, khong phu thuoc vao viec tu nhan dien.
+CREATE TABLE IF NOT EXISTS online_book_toc_entries (
+  id SERIAL PRIMARY KEY,
+  online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  page_number INTEGER NOT NULL, -- so trang nguoi doc se thay (bat dau tu 1)
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS online_book_purchases (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

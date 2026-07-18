@@ -154,6 +154,8 @@
   const unlocked = <%- unlocked ? 'true' : 'false' %>;
   const bookSlug = <%- JSON.stringify(book.slug) %>;
   const buySlug = '/doc-sach-online/' + bookSlug;
+  // Muc luc go tay tu trang quan tri (uu tien dung neu co, thay vi tu nhan dien)
+  const manualToc = <%- JSON.stringify((manualToc || []).map(e => ({ title: e.title, pageNumber: e.page_number }))) %>;
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -206,50 +208,60 @@
       pageDiv.appendChild(canvas);
       container.appendChild(pageDiv);
 
-      try {
-        const textContent = await page.getTextContent();
-        const heading = findHeadingOnPage(textContent.items);
-        if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: false, level: 0 });
-      } catch (e) { /* khong sao neu trang khong doc duoc text (anh scan...) */ }
-    }
-
-    // Neu con trang bi khoa (chua mua), quet tiep phan text (khong render anh) de muc luc van day du,
-    // cac chuong sau diem khoa se hien kem bieu tuong khoa, bam vao se dan toi trang mua sach
-    if (!unlocked && totalPages > pagesToRender) {
-      for (let i = pagesToRender + 1; i <= totalPages; i++) {
+      if (manualToc.length === 0) {
         try {
-          const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           const heading = findHeadingOnPage(textContent.items);
-          if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: true, level: 0 });
-        } catch (e) { /* bo qua */ }
+          if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: false, level: 0 });
+        } catch (e) { /* khong sao neu trang khong doc duoc text (anh scan...) */ }
       }
     }
 
-    // Neu file PDF co san muc luc/bookmark (outline) thi uu tien dung, chuan xac hon viec do chu.
-    // Chi lay toi da 2 cap (chuong + bai/muc con) va bo qua nhung dong qua dai (thuong la loi giai/
-    // dap an bi nhung nham thanh bookmark rat sau trong file goc) de muc luc gon gang, de dung.
-    const MAX_TOC_LEVEL = 1;
-    const MAX_TITLE_LEN = 70;
-    try {
-      const outline = await pdf.getOutline();
-      if (outline && outline.length) {
-        tocEntries.length = 0;
-        async function flattenOutline(items, level) {
-          for (const item of items) {
-            const title = (item.title || '').trim();
-            let dest = item.dest;
-            if (typeof dest === 'string') dest = await pdf.getDestination(dest);
-            if (dest && dest[0] != null && title && title.length <= MAX_TITLE_LEN) {
-              const pageIndex = await pdf.getPageIndex(dest[0]);
-              tocEntries.push({ title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level });
-            }
-            if (item.items && item.items.length && level < MAX_TOC_LEVEL) await flattenOutline(item.items, level + 1);
-          }
+    if (manualToc.length > 0) {
+      // Uu tien tuyet doi muc luc go tay tu trang quan tri: bo qua het cac buoc tu nhan dien ben duoi.
+      manualToc.forEach(e => {
+        const pageIndex = Math.max(0, (e.pageNumber || 1) - 1);
+        tocEntries.push({ title: e.title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level: 0 });
+      });
+    } else {
+      // Neu con trang bi khoa (chua mua), quet tiep phan text (khong render anh) de muc luc van day du,
+      // cac chuong sau diem khoa se hien kem bieu tuong khoa, bam vao se dan toi trang mua sach
+      if (!unlocked && totalPages > pagesToRender) {
+        for (let i = pagesToRender + 1; i <= totalPages; i++) {
+          try {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const heading = findHeadingOnPage(textContent.items);
+            if (heading) tocEntries.push({ title: heading, pageIndex: i - 1, locked: true, level: 0 });
+          } catch (e) { /* bo qua */ }
         }
-        await flattenOutline(outline, 0);
       }
-    } catch (e) { /* khong co outline thi thoi, dung ket qua tu nhan dien van ban o tren */ }
+
+      // Neu file PDF co san muc luc/bookmark (outline) thi uu tien dung, chuan xac hon viec do chu.
+      // Chi lay toi da 2 cap (chuong + bai/muc con) va bo qua nhung dong qua dai (thuong la loi giai/
+      // dap an bi nhung nham thanh bookmark rat sau trong file goc) de muc luc gon gang, de dung.
+      const MAX_TOC_LEVEL = 1;
+      const MAX_TITLE_LEN = 70;
+      try {
+        const outline = await pdf.getOutline();
+        if (outline && outline.length) {
+          tocEntries.length = 0;
+          async function flattenOutline(items, level) {
+            for (const item of items) {
+              const title = (item.title || '').trim();
+              let dest = item.dest;
+              if (typeof dest === 'string') dest = await pdf.getDestination(dest);
+              if (dest && dest[0] != null && title && title.length <= MAX_TITLE_LEN) {
+                const pageIndex = await pdf.getPageIndex(dest[0]);
+                tocEntries.push({ title, pageIndex, locked: !unlocked && pageIndex >= pagesToRender, level });
+              }
+              if (item.items && item.items.length && level < MAX_TOC_LEVEL) await flattenOutline(item.items, level + 1);
+            }
+          }
+          await flattenOutline(outline, 0);
+        }
+      } catch (e) { /* khong co outline thi thoi, dung ket qua tu nhan dien van ban o tren */ }
+    }
 
     if (!unlocked && totalPages > previewLimit) {
       const lockDiv = document.createElement('div');

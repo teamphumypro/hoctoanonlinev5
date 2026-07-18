@@ -19,6 +19,9 @@
           <td><span class="badge bg-<%= b.is_published ? 'success' : 'secondary' %>"><%= b.is_published ? 'Hiển thị' : 'Ẩn' %></span></td>
           <td class="text-nowrap">
             <a href="/admin/doc-sach-online/<%= b.id %>/sua" class="btn btn-sm btn-outline-primary">Sửa / Gắn file PDF</a>
+            <% if (b.file_url) { %>
+              <a href="/admin/doc-sach-online/<%= b.id %>/muc-luc" class="btn btn-sm btn-outline-success" title="Tự gõ tiêu đề + số trang">Mục lục (gõ tay)</a>
+            <% } %>
             <a href="/admin/doc-sach-online/<%= b.id %>/chuong" class="btn btn-sm btn-outline-secondary" title="Cách cũ, tách theo chương">Chương (nâng cao)</a>
             <form method="POST" action="/admin/doc-sach-online/<%= b.id %>/xoa" class="d-inline" onsubmit="return confirm('Xóa sách này?')">
               <button class="btn btn-sm btn-outline-danger">Xóa</button>

@@ -1,5 +1,6 @@
 const OnlineBook = require('../models/OnlineBook');
 const OnlineBookChapter = require('../models/OnlineBookChapter');
+const OnlineBookTocEntry = require('../models/OnlineBookTocEntry');
 const { makeSlug } = require('../utils');
 const fs = require('fs');
 
@@ -141,4 +142,44 @@ exports.chapterImportSave = async (req, res) => {
     await OnlineBookChapter.create({ online_book_id, title, content: row.content || '', is_free: row.is_free === 'on' });
   }
   res.redirect(`/admin/doc-sach-online/${online_book_id}/chuong`);
+};
+
+// ---- Muc luc go tay (tieu de + so trang), danh cho sach kieu 1 file PDF ----
+exports.tocPage = async (req, res) => {
+  const book = await OnlineBook.findById(req.params.id);
+  if (!book) return res.redirect('/admin/doc-sach-online');
+  const entries = await OnlineBookTocEntry.byBook(book.id);
+  res.render('admin/online-books/toc', { book, entries });
+};
+
+exports.tocCreate = async (req, res) => {
+  const { online_book_id, title, page_number } = req.body;
+  const t = (title || '').trim();
+  const p = parseInt(page_number, 10);
+  if (t && p > 0) {
+    await OnlineBookTocEntry.create({ online_book_id, title: t, page_number: p });
+  }
+  res.redirect(`/admin/doc-sach-online/${online_book_id}/muc-luc`);
+};
+
+exports.tocEntryEditForm = async (req, res) => {
+  const entry = await OnlineBookTocEntry.findById(req.params.id);
+  if (!entry) return res.redirect('/admin/doc-sach-online');
+  const book = await OnlineBook.findById(entry.online_book_id);
+  res.render('admin/online-books/toc-entry-form', { entry, book });
+};
+
+exports.tocUpdate = async (req, res) => {
+  const { online_book_id, title, page_number } = req.body;
+  const t = (title || '').trim();
+  const p = parseInt(page_number, 10);
+  if (t && p > 0) {
+    await OnlineBookTocEntry.update(req.params.id, { title: t, page_number: p });
+  }
+  res.redirect(`/admin/doc-sach-online/${online_book_id}/muc-luc`);
+};
+
+exports.tocDelete = async (req, res) => {
+  await OnlineBookTocEntry.delete(req.params.id);
+  res.redirect(`/admin/doc-sach-online/${req.body.online_book_id}/muc-luc`);
 };

@@ -106,6 +106,12 @@ router.post('/doc-sach-online-chuong/sap-xep', requireRole('teacher'), adminOnli
 router.post('/doc-sach-online-chuong/:id', requireRole('teacher'), adminOnlineBookController.chapterUpdate);
 router.post('/doc-sach-online-chuong/:id/xoa', requireRole('teacher'), adminOnlineBookController.chapterDelete);
 
+router.get('/doc-sach-online/:id/muc-luc', requireRole('teacher'), adminOnlineBookController.tocPage);
+router.post('/doc-sach-online-muc-luc', requireRole('teacher'), adminOnlineBookController.tocCreate);
+router.get('/doc-sach-online-muc-luc/:id/sua', requireRole('teacher'), adminOnlineBookController.tocEntryEditForm);
+router.post('/doc-sach-online-muc-luc/:id', requireRole('teacher'), adminOnlineBookController.tocUpdate);
+router.post('/doc-sach-online-muc-luc/:id/xoa', requireRole('teacher'), adminOnlineBookController.tocDelete);
+
 // ---- Noi dung khoa hoc: Chuong > Bai > Video/File ----
 router.get('/khoa-hoc/:id/noi-dung', courseController.contentPage);
 
