@@ -474,3 +474,14 @@ CREATE TABLE IF NOT EXISTS book_types (
   position INTEGER NOT NULL DEFAULT 0
 );
 ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type_id INTEGER REFERENCES book_types(id) ON DELETE SET NULL;
+
+-- ---------- BO SUNG: Danh muc rieng cho "Doc sach online", TACH BIET hoan toan voi Danh muc Sach (book_categories) ----------
+CREATE TABLE IF NOT EXISTS online_book_categories (
+  id SERIAL PRIMARY KEY,
+  parent_id INTEGER REFERENCES online_book_categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE online_books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES online_book_categories(id) ON DELETE SET NULL;

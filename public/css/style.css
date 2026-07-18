@@ -91,6 +91,28 @@ code, .mono{ font-family:'IBM Plex Mono',monospace; }
 .sidebar-cat a{ color:var(--text); font-weight:500; }
 .sidebar-cat a:hover{ color:var(--orange); }
 
+/* ---------- Cay danh muc thu gon/mo rong (+/-) ---------- */
+.cat-tree{ font-size:.9rem; }
+.cat-tree-list{ list-style:none; margin:0; padding:0; }
+.cat-tree-list:not(.cat-tree-root){ margin-left:1.1rem; }
+.cat-tree-item{ margin:0; }
+.cat-tree-row{ display:flex; align-items:center; gap:.4rem; padding:.18rem 0; }
+.cat-tree-row-all{ margin-bottom:.15rem; padding-bottom:.35rem; border-bottom:1px solid var(--line); }
+.cat-tree-toggle{
+  flex:0 0 auto; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center;
+  border:none; background:none; padding:0; color:#9a99ad; font-size:.85rem; cursor:pointer; line-height:1;
+}
+.cat-tree-toggle.is-open{ color:var(--orange); }
+.cat-tree-toggle-leaf{ cursor:default; color:#c7c6d6; font-size:.75rem; }
+.cat-tree-link{ color:var(--text); font-weight:500; text-decoration:none; }
+.cat-tree-link:hover{ color:var(--orange); }
+.cat-tree-link.is-active{ color:var(--orange); font-weight:700; }
+.cat-tree-children{
+  overflow:hidden; max-height:2000px; transition:max-height .2s ease;
+  border-left:1px dashed var(--line); margin-left:7px; padding-left:.3rem;
+}
+.cat-tree-children.is-collapsed{ max-height:0; }
+
 /* ---------- Forms ---------- */
 .form-control, .form-select{ border-radius:10px; border-color:var(--line); }
 .form-control:focus, .form-select:focus{ border-color:var(--orange); box-shadow:0 0 0 3px rgba(242,96,31,.15); }

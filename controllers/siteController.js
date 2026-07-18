@@ -75,8 +75,18 @@ exports.bookDetail = async (req, res) => {
 
 exports.onlineReadingBooks = async (req, res) => {
   const OnlineBook = require('../models/OnlineBook');
-  const books = await OnlineBook.published();
-  res.render('online-reading-books', { books });
+  const OnlineBookCategory = require('../models/OnlineBookCategory');
+
+  const categories = await OnlineBookCategory.tree();
+
+  let category_id = null;
+  if (req.query.danh_muc) {
+    const cat = await OnlineBookCategory.findBySlug(req.query.danh_muc);
+    if (cat) category_id = cat.id;
+  }
+
+  const books = await OnlineBook.published({ category_id });
+  res.render('online-reading-books', { books, categories, activeCategory: req.query.danh_muc || null });
 };
 
 exports.onlineBookDetail = async (req, res) => {

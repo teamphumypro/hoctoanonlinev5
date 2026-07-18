@@ -1,6 +1,7 @@
 const OnlineBook = require('../models/OnlineBook');
 const OnlineBookChapter = require('../models/OnlineBookChapter');
 const OnlineBookTocEntry = require('../models/OnlineBookTocEntry');
+const OnlineBookCategory = require('../models/OnlineBookCategory');
 const { makeSlug } = require('../utils');
 const fs = require('fs');
 
@@ -9,7 +10,10 @@ exports.list = async (req, res) => {
   res.render('admin/online-books/list', { books });
 };
 
-exports.newForm = (req, res) => res.render('admin/online-books/form', { book: null });
+exports.newForm = async (req, res) => {
+  const categories = await OnlineBookCategory.tree();
+  res.render('admin/online-books/form', { book: null, categories });
+};
 
 // Lay file_url/file_source tu form: uu tien file PDF vua upload, sau do toi link dan tay
 function resolveFileField(req) {
@@ -21,13 +25,14 @@ function resolveFileField(req) {
 }
 
 exports.create = async (req, res) => {
-  const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link } = req.body;
+  const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link, category_id } = req.body;
   const uploadedCover = req.files && req.files.cover && req.files.cover[0];
   const cover_url = uploadedCover ? '/uploads/thumbnails/' + uploadedCover.filename : (cover_url_link || null);
   const { file_url, file_source } = resolveFileField(req);
   const book = await OnlineBook.create({
     title, author, short_desc, description, price, compare_at_price: compare_at_price || null,
-    cover_url, is_published: is_published === 'on', slug: makeSlug(title), file_url, file_source
+    cover_url, is_published: is_published === 'on', slug: makeSlug(title), file_url, file_source,
+    category_id: category_id || null
   });
   res.redirect(`/admin/doc-sach-online/${book.id}/sua`);
 };
@@ -35,17 +40,19 @@ exports.create = async (req, res) => {
 exports.editForm = async (req, res) => {
   const book = await OnlineBook.findById(req.params.id);
   if (!book) return res.redirect('/admin/doc-sach-online');
-  res.render('admin/online-books/form', { book });
+  const categories = await OnlineBookCategory.tree();
+  res.render('admin/online-books/form', { book, categories });
 };
 
 exports.update = async (req, res) => {
-  const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link } = req.body;
+  const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link, category_id } = req.body;
   const uploadedCover = req.files && req.files.cover && req.files.cover[0];
   const cover_url = uploadedCover ? '/uploads/thumbnails/' + uploadedCover.filename : (cover_url_link || null);
   const { file_url, file_source } = resolveFileField(req);
   await OnlineBook.update(req.params.id, {
     title, author, short_desc, description, price, compare_at_price: compare_at_price || null,
-    cover_url, is_published: is_published === 'on', file_url, file_source
+    cover_url, is_published: is_published === 'on', file_url, file_source,
+    category_id: category_id || null
   });
   res.redirect('/admin/doc-sach-online');
 };
@@ -182,4 +189,38 @@ exports.tocUpdate = async (req, res) => {
 exports.tocDelete = async (req, res) => {
   await OnlineBookTocEntry.delete(req.params.id);
   res.redirect(`/admin/doc-sach-online/${req.body.online_book_id}/muc-luc`);
+};
+
+// ---- Quan ly "Danh muc doc sach online" - cay rieng, TACH BIET voi Danh muc Sach va Danh muc Khoa hoc ----
+exports.categories = async (req, res) => {
+  const tree = await OnlineBookCategory.tree();
+  res.render('admin/online-books/categories', { tree });
+};
+exports.categoryNewForm = async (req, res) => {
+  const categories = await OnlineBookCategory.all();
+  res.render('admin/online-books/category-form', { category: null, categories });
+};
+exports.categoryCreate = async (req, res) => {
+  const { name, parent_id } = req.body;
+  await OnlineBookCategory.create({ name, parent_id: parent_id || null, slug: makeSlug(name) });
+  res.redirect('/admin/doc-sach-online/danh-muc');
+};
+exports.categoryEditForm = async (req, res) => {
+  const category = await OnlineBookCategory.findById(req.params.id);
+  const categories = (await OnlineBookCategory.all()).filter(c => c.id != req.params.id);
+  res.render('admin/online-books/category-form', { category, categories });
+};
+exports.categoryUpdate = async (req, res) => {
+  const { name, parent_id } = req.body;
+  const existing = await OnlineBookCategory.findById(req.params.id);
+  await OnlineBookCategory.update(req.params.id, { name, parent_id: parent_id || null, slug: existing.slug });
+  res.redirect('/admin/doc-sach-online/danh-muc');
+};
+exports.categoryDelete = async (req, res) => {
+  await OnlineBookCategory.delete(req.params.id);
+  res.redirect('/admin/doc-sach-online/danh-muc');
+};
+exports.categoryReorder = async (req, res) => {
+  await OnlineBookCategory.reorder(req.body.ids);
+  res.json({ ok: true });
 };

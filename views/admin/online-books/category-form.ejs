@@ -1,0 +1,22 @@
+<% var pageTitle = category ? 'Sửa danh mục đọc sách online' : 'Thêm danh mục đọc sách online' %>
+<%- include('../../partials/admin-header') %>
+<div class="card p-4" style="max-width:520px">
+  <form method="POST" action="<%= category ? '/admin/doc-sach-online/danh-muc/' + category.id : '/admin/doc-sach-online/danh-muc' %>">
+    <div class="mb-3">
+      <label class="form-label">Tên danh mục</label>
+      <input name="name" class="form-control" value="<%= category ? category.name : '' %>" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Danh mục cha (để trống nếu là danh mục gốc)</label>
+      <select name="parent_id" class="form-select">
+        <option value="">-- Không có (danh mục gốc) --</option>
+        <% categories.forEach(c => { %>
+          <option value="<%= c.id %>" <%= category && category.parent_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <button class="btn btn-primary">Lưu</button>
+    <a href="/admin/doc-sach-online/danh-muc" class="btn btn-outline-secondary">Hủy</a>
+  </form>
+</div>
+<%- include('../../partials/admin-footer') %>

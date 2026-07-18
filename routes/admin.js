@@ -69,6 +69,14 @@ router.post('/sach/:id', requireRole('teacher'), uploadThumbnail.single('cover')
 router.post('/sach/:id/xoa', requireRole('admin'), adminBookController.delete);
 
 // ---- Doc sach online (TACH RIENG HOAN TOAN voi Sach) ----
+router.get('/doc-sach-online/danh-muc', requireRole('admin'), adminOnlineBookController.categories);
+router.get('/doc-sach-online/danh-muc/them-moi', requireRole('admin'), adminOnlineBookController.categoryNewForm);
+router.post('/doc-sach-online/danh-muc', requireRole('admin'), adminOnlineBookController.categoryCreate);
+router.get('/doc-sach-online/danh-muc/:id/sua', requireRole('admin'), adminOnlineBookController.categoryEditForm);
+router.post('/doc-sach-online/danh-muc/sap-xep', requireRole('admin'), adminOnlineBookController.categoryReorder);
+router.post('/doc-sach-online/danh-muc/:id', requireRole('admin'), adminOnlineBookController.categoryUpdate);
+router.post('/doc-sach-online/danh-muc/:id/xoa', requireRole('admin'), adminOnlineBookController.categoryDelete);
+
 router.get('/doc-sach-online', requireRole('teacher'), adminOnlineBookController.list);
 router.get('/doc-sach-online/them-moi', requireRole('teacher'), adminOnlineBookController.newForm);
 router.post('/doc-sach-online', requireRole('teacher'), (req, res, next) => {

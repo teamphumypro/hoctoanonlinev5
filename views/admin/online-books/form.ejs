@@ -10,6 +10,21 @@
         <input name="author" class="form-control" value="<%= book ? book.author : '' %>"></div>
       <div class="mb-3"><label class="form-label">Mô tả ngắn</label>
         <input name="short_desc" class="form-control" value="<%= book ? book.short_desc : '' %>"></div>
+      <div class="mb-3"><label class="form-label">Danh mục <span class="text-muted fw-normal">(tùy chọn)</span></label>
+        <select name="category_id" class="form-select">
+          <option value="">-- Không thuộc danh mục cụ thể --</option>
+          <% function renderOnlineCatOptions(cats, depth) { %>
+            <% cats.forEach(c => { %>
+              <option value="<%= c.id %>" <%= book && book.category_id === c.id ? 'selected' : '' %>>
+                <%= '\u00A0\u00A0\u00A0\u00A0'.repeat(depth) %><%= depth > 0 ? '↳ ' : '' %><%= c.name %>
+              </option>
+              <% if (c.children && c.children.length) renderOnlineCatOptions(c.children, depth + 1) %>
+            <% }) %>
+          <% } %>
+          <% renderOnlineCatOptions(categories, 0) %>
+        </select>
+        <div class="form-text">Chưa có danh mục phù hợp? Vào menu <strong>"Danh mục đọc sách online"</strong> bên trái để thêm trước.</div>
+      </div>
       <div class="mb-0"><label class="form-label">Mô tả chi tiết</label>
         <div id="descEditor" style="height:180px; background:#fff"></div>
         <input type="hidden" name="description" id="descHidden" value="<%= book ? book.description : '' %>">
