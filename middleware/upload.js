@@ -26,7 +26,7 @@ const uploadExamDoc = multer({
   storage: makeStorage('exam-imports'),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = /\.(docx|pdf|doc)$/i.test(file.originalname);
+    const ok = /\.(docx|pdf|doc|xlsx|xls|jpg|jpeg|png|webp)$/i.test(file.originalname);
     cb(null, ok);
   }
 });

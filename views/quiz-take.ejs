@@ -37,13 +37,13 @@
             <% } %>
 
             <div class="mb-4">
-              <p class="fw-semibold">Câu <%= qi+1 %> (<%= q.points %>đ): <%= q.question %></p>
+              <p class="fw-semibold">Câu <%= qi+1 %> (<%= q.points %>đ): <%- q.question %></p>
 
               <% if (q.type === 'single_choice') { %>
                 <% q.options.forEach(o => { %>
                   <div class="form-check mb-1">
                     <input class="form-check-input" type="radio" name="answers[<%= q.id %>]" value="<%= o.id %>" id="opt<%= o.id %>">
-                    <label class="form-check-label" for="opt<%= o.id %>"><%= o.option_text %></label>
+                    <label class="form-check-label" for="opt<%= o.id %>"><%- o.option_text %></label>
                   </div>
                 <% }) %>
 
@@ -53,7 +53,7 @@
                   <tbody>
                     <% q.tfItems.forEach((item, i) => { %>
                       <tr>
-                        <td><%= String.fromCharCode(97+i) %>) <%= item.content %></td>
+                        <td><%= String.fromCharCode(97+i) %>) <%- item.content %></td>
                         <td class="text-center"><input type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="true"></td>
                         <td class="text-center"><input type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="false"></td>
                       </tr>

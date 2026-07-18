@@ -102,14 +102,14 @@ exports.chapterImport = async (req, res) => {
       return res.render('admin/online-books/chapter-import-upload', { book, error: 'Vui lòng chọn file .docx/.pdf hoặc dán link Google Drive.' });
     }
 
-    const rawText = await extractText(filePath);
+    const { text: rawText, images } = await extractText(filePath);
     fs.unlink(filePath, () => {});
 
     if (!rawText || rawText.trim().length < 20) {
       return res.render('admin/online-books/chapter-import-upload', { book, error: 'Không đọc được nội dung chữ nào từ file này. Có thể đây là file scan dạng ảnh, hoặc file bị lỗi.' });
     }
 
-    const chapters = splitIntoChapters(rawText);
+    const chapters = splitIntoChapters(rawText, images);
     res.render('admin/online-books/chapter-import-review', { book, chapters });
   } catch (err) {
     console.error('Loi nhap noi dung sach doc online:', err);

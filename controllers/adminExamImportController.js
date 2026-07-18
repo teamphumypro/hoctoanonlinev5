@@ -32,7 +32,7 @@ exports.upload = async (req, res) => {
       });
     }
 
-    const rawText = await extractText(filePath);
+    const { text: rawText, images } = await extractText(filePath);
     fs.unlink(filePath, () => {}); // xoa file tam ngay sau khi doc xong, khong luu lai
 
     if (!rawText || rawText.trim().length < 20) {
@@ -49,15 +49,15 @@ exports.upload = async (req, res) => {
 
     if (wantAI) {
       try {
-        questions = await parseWithAI(rawText, config);
+        questions = await parseWithAI(rawText, config, images);
         usedAI = true;
       } catch (err) {
         console.error('Loi AI parse de thi:', err.message);
         aiError = err.message;
-        questions = parseExamText(rawText);
+        questions = parseExamText(rawText, images);
       }
     } else {
-      questions = parseExamText(rawText);
+      questions = parseExamText(rawText, images);
     }
 
     res.render('admin/quizzes/import-review', { quiz, questions, usedAI, aiError });

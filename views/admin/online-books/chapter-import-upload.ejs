@@ -9,13 +9,13 @@
   <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
 
   <div class="alert alert-warning small">
-    <strong>Lưu ý:</strong> hệ thống tự tách chương dựa vào các dòng dạng "Chương 1", "CHƯƠNG I", "Phần 1"... trong file. Nếu file không có các dòng này, toàn bộ nội dung sẽ gom vào 1 chương để bạn tự tách tay sau. <strong>Không đọc được công thức Toán/Lý/Hóa dạng Equation/MathType và PDF dạng ảnh scan.</strong> Bạn sẽ được xem trước và sửa lại toàn bộ trước khi lưu. Nếu dùng link Drive, file cần dưới 25MB và đã bật chia sẻ công khai.
+    <strong>Lưu ý:</strong> hệ thống tự tách chương dựa vào các dòng dạng "Chương 1", "CHƯƠNG I", "Phần 1"... trong file. Nếu file không có các dòng này, toàn bộ nội dung sẽ gom vào 1 chương để bạn tự tách tay sau. Đọc được .docx/.pdf/.xlsx và <strong>ảnh (.jpg/.png, dùng OCR — độ chính xác thấp hơn nhiều so với file gốc)</strong>. <strong>Không đọc được công thức Toán/Lý/Hóa dạng Equation/MathType và PDF dạng ảnh scan.</strong> Bạn sẽ được xem trước và sửa lại toàn bộ trước khi lưu. Nếu dùng link Drive, file cần dưới 25MB và đã bật chia sẻ công khai.
   </div>
 
   <form method="POST" action="/admin/doc-sach-online/<%= book.id %>/chuong/nhap-tu-file" enctype="multipart/form-data">
     <div class="mb-3">
-      <label class="form-label">Chọn file (.docx hoặc .pdf)</label>
-      <input type="file" name="exam_file" class="form-control" accept=".docx,.pdf">
+      <label class="form-label">Chọn file (.docx, .pdf, .xlsx hoặc ảnh .jpg/.png)</label>
+      <input type="file" name="exam_file" class="form-control" accept=".docx,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp">
     </div>
     <div class="mb-3 text-center text-muted small">— hoặc —</div>
     <div class="mb-3">

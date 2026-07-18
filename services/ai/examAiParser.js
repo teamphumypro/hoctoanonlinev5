@@ -13,11 +13,14 @@ Mỗi phần tử trong mảng là 1 câu hỏi theo đúng 1 trong 4 dạng sau
 
 Quy tắc quan trọng:
 - Nếu văn bản có công thức Toán/Lý/Hóa bị lỗi ký tự do không đọc được từ file gốc, hãy cố suy luận lại nội dung hợp lý nhất có thể dựa trên ngữ cảnh, và nếu không chắc chắn, giữ nguyên phần chữ đọc được, không tự bịa số liệu.
+- Nếu trong văn bản có các token dạng [[IMG:0]], [[IMG:1]]... (đại diện cho hình ảnh/công thức được nhúng trong file gốc), PHẢI giữ nguyên y hệt các token này ở đúng vị trí trong câu hỏi/phương án tương ứng, không được xóa, đổi số, hay diễn giải nội dung của chúng.
 - Nếu tìm thấy đáp án đúng trong đề (ghi rõ hoặc có bảng đáp án), hãy gán correctIndex/is_correct/correct_answer tương ứng. Nếu KHÔNG chắc chắn đáp án đúng, vẫn tạo câu hỏi bình thường nhưng chọn correctIndex là -1 (nghĩa là chưa xác định, để người dùng tự chọn lại).
 - Giữ nguyên số thứ tự và nội dung câu hỏi càng sát bản gốc càng tốt.
 - Chỉ trả về mảng JSON, không thêm bất kỳ chữ nào khác.`;
 
-async function parseWithAI(examText, config) {
+const { restoreImages } = require('../examImport/extractText');
+
+async function parseWithAI(examText, config, images = []) {
   const apiKey = (config.ai_api_key || '').trim();
   if (!apiKey) throw new Error('Chưa cấu hình AI API Key');
   const model = (config.ai_model || 'claude-sonnet-5').trim();
@@ -48,7 +51,15 @@ async function parseWithAI(examText, config) {
 
   const parsed = JSON.parse(jsonStr);
   if (!Array.isArray(parsed)) throw new Error('AI không trả về mảng câu hỏi hợp lệ');
-  return parsed.map(q => ({ ...q, needsReview: q.correctIndex === -1 || q.needsReview === true }));
+
+  // Khoi phuc lai anh/cong thuc nhung (tu [[IMG:n]] thanh the <img> that) trong tung cau hoi/phuong an
+  return parsed.map(q => {
+    const restored = { ...q, needsReview: q.correctIndex === -1 || q.needsReview === true };
+    if (restored.question) restored.question = restoreImages(restored.question, images);
+    if (Array.isArray(restored.options)) restored.options = restored.options.map(o => restoreImages(o, images));
+    if (Array.isArray(restored.items)) restored.items = restored.items.map(it => ({ ...it, content: restoreImages(it.content, images) }));
+    return restored;
+  });
 }
 
 module.exports = { parseWithAI };

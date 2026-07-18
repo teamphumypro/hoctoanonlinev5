@@ -104,7 +104,7 @@
               q.type === 'single_choice' ? 'Trắc nghiệm' :
               q.type === 'true_false' ? 'Đúng/Sai' :
               q.type === 'short_answer' ? 'Trả lời ngắn' : 'Tự luận' %></span>
-            <span class="text-muted small">(<%= q.points %>đ)</span>: <%= q.question %>
+            <span class="text-muted small">(<%= q.points %>đ)</span>: <%- q.question %>
           </strong>
           <form method="POST" action="/admin/cau-hoi/<%= q.id %>/xoa" onsubmit="return confirm('Xóa câu hỏi này?')">
             <% if (lesson) { %><input type="hidden" name="lesson_id" value="<%= lesson.id %>"><% } %>
@@ -116,13 +116,13 @@
         <% if (q.type === 'single_choice') { %>
           <ul class="list-unstyled small mb-0 mt-1">
             <% q.options.forEach(o => { %>
-              <li class="<%= o.is_correct ? 'text-success fw-bold' : '' %>"><%= o.is_correct ? '✓' : '·' %> <%= o.option_text %></li>
+              <li class="<%= o.is_correct ? 'text-success fw-bold' : '' %>"><%= o.is_correct ? '✓' : '·' %> <%- o.option_text %></li>
             <% }) %>
           </ul>
         <% } else if (q.type === 'true_false') { %>
           <ul class="list-unstyled small mb-0 mt-1">
             <% q.tfItems.forEach((item, i) => { %>
-              <li><%= String.fromCharCode(97+i) %>) <%= item.content %> — <span class="<%= item.is_correct ? 'text-success fw-bold' : 'text-danger' %>"><%= item.is_correct ? 'Đúng' : 'Sai' %></span></li>
+              <li><%= String.fromCharCode(97+i) %>) <%- item.content %> — <span class="<%= item.is_correct ? 'text-success fw-bold' : 'text-danger' %>"><%= item.is_correct ? 'Đúng' : 'Sai' %></span></li>
             <% }) %>
           </ul>
         <% } else if (q.type === 'short_answer') { %>
