@@ -49,17 +49,17 @@ exports.allBooks = async (req, res) => {
   const categories = await BookCategory.tree();
   const bookTypes = await BookType.all();
 
-  let category_id = null, book_type_id = null;
+  let category_id = null, category_ids = null, book_type_id = null;
   if (req.query.danh_muc) {
     const cat = await BookCategory.findBySlug(req.query.danh_muc);
-    if (cat) category_id = cat.id;
+    if (cat) { category_id = cat.id; category_ids = await BookCategory.subtreeIds(cat.id); }
   }
   if (req.query.the_loai) {
     const bt = await BookType.findBySlug(req.query.the_loai);
     if (bt) book_type_id = bt.id;
   }
 
-  const books = await Book.published({ category_id, book_type_id });
+  const books = await Book.published({ category_ids, book_type_id });
   res.render('all-books', { books, categories, bookTypes, activeCategory: req.query.danh_muc || null, activeType: req.query.the_loai || null });
 };
 
@@ -79,13 +79,13 @@ exports.onlineReadingBooks = async (req, res) => {
 
   const categories = await OnlineBookCategory.tree();
 
-  let category_id = null;
+  let category_id = null, category_ids = null;
   if (req.query.danh_muc) {
     const cat = await OnlineBookCategory.findBySlug(req.query.danh_muc);
-    if (cat) category_id = cat.id;
+    if (cat) { category_id = cat.id; category_ids = await OnlineBookCategory.subtreeIds(cat.id); }
   }
 
-  const books = await OnlineBook.published({ category_id });
+  const books = await OnlineBook.published({ category_ids });
   res.render('online-reading-books', { books, categories, activeCategory: req.query.danh_muc || null });
 };
 

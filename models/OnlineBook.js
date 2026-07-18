@@ -9,10 +9,16 @@ const OnlineBook = {
       ORDER BY ob.created_at DESC`);
     return r.rows;
   },
-  async published({ category_id } = {}) {
+  // filters: { category_id, category_ids } - deu tuy chon.
+  // category_ids (mang): dung khi loc theo 1 danh muc cha, gom ca sach cua danh muc con ben trong.
+  async published({ category_id, category_ids } = {}) {
     const params = [];
     let where = 'ob.is_published=1';
-    if (category_id) { params.push(category_id); where += ` AND ob.category_id=$${params.length}`; }
+    if (category_ids && category_ids.length) {
+      params.push(category_ids); where += ` AND ob.category_id = ANY($${params.length}::int[])`;
+    } else if (category_id) {
+      params.push(category_id); where += ` AND ob.category_id=$${params.length}`;
+    }
     const r = await db.query(`
       SELECT ob.*, obc.name AS category_name,
         (SELECT COUNT(*) FROM online_book_chapters WHERE online_book_id=ob.id) AS chapter_count

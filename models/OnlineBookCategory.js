@@ -25,6 +25,18 @@ const OnlineBookCategory = {
     const r = await db.query('SELECT * FROM online_book_categories WHERE slug=$1', [slug]);
     return r.rows[0];
   },
+  // Tra ve mang [id] gom chinh danh muc nay + TAT CA danh muc con chau (moi cap)
+  async subtreeIds(id) {
+    const flat = await this.all();
+    const result = [Number(id)];
+    let frontier = [Number(id)];
+    while (frontier.length) {
+      const next = flat.filter(c => frontier.includes(c.parent_id)).map(c => c.id);
+      result.push(...next);
+      frontier = next;
+    }
+    return result;
+  },
   async create({ parent_id, name, slug, position = 0 }) {
     const r = await db.query(
       `INSERT INTO online_book_categories (parent_id,name,slug,position) VALUES ($1,$2,$3,$4) RETURNING *`,
