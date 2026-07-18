@@ -10,14 +10,25 @@ exports.list = async (req, res) => {
 
 exports.newForm = (req, res) => res.render('admin/online-books/form', { book: null });
 
+// Lay file_url/file_source tu form: uu tien file PDF vua upload, sau do toi link dan tay
+function resolveFileField(req) {
+  const uploadedBookFile = req.files && req.files.book_file && req.files.book_file[0];
+  if (uploadedBookFile) return { file_url: '/uploads/online-books/' + uploadedBookFile.filename, file_source: 'upload' };
+  const link = (req.body.book_file_link || '').trim();
+  if (link) return { file_url: link, file_source: 'link' };
+  return { file_url: null, file_source: null };
+}
+
 exports.create = async (req, res) => {
   const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link } = req.body;
-  const cover_url = req.file ? '/uploads/thumbnails/' + req.file.filename : (cover_url_link || null);
+  const uploadedCover = req.files && req.files.cover && req.files.cover[0];
+  const cover_url = uploadedCover ? '/uploads/thumbnails/' + uploadedCover.filename : (cover_url_link || null);
+  const { file_url, file_source } = resolveFileField(req);
   const book = await OnlineBook.create({
     title, author, short_desc, description, price, compare_at_price: compare_at_price || null,
-    cover_url, is_published: is_published === 'on', slug: makeSlug(title)
+    cover_url, is_published: is_published === 'on', slug: makeSlug(title), file_url, file_source
   });
-  res.redirect(`/admin/doc-sach-online/${book.id}/chuong`);
+  res.redirect(`/admin/doc-sach-online/${book.id}/sua`);
 };
 
 exports.editForm = async (req, res) => {
@@ -28,10 +39,12 @@ exports.editForm = async (req, res) => {
 
 exports.update = async (req, res) => {
   const { title, author, short_desc, description, price, compare_at_price, is_published, cover_url_link } = req.body;
-  const cover_url = req.file ? '/uploads/thumbnails/' + req.file.filename : (cover_url_link || null);
+  const uploadedCover = req.files && req.files.cover && req.files.cover[0];
+  const cover_url = uploadedCover ? '/uploads/thumbnails/' + uploadedCover.filename : (cover_url_link || null);
+  const { file_url, file_source } = resolveFileField(req);
   await OnlineBook.update(req.params.id, {
     title, author, short_desc, description, price, compare_at_price: compare_at_price || null,
-    cover_url, is_published: is_published === 'on'
+    cover_url, is_published: is_published === 'on', file_url, file_source
   });
   res.redirect('/admin/doc-sach-online');
 };

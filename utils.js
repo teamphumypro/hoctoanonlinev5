@@ -44,4 +44,13 @@ function embedPdfUrl(url) {
   return url;
 }
 
-module.exports = { makeSlug, genActivationCode, genCertCode, formatVND, formatDate, embedVideoInfo, embedPdfUrl };
+// Chuyen link chia se Google Drive (dang /file/d/XXXX/view) thanh link tai truc tiep (uc?export=download&id=XXXX)
+// Link tu cac noi luu tru khac (S3, CDN, link .pdf truc tiep...) duoc giu nguyen
+function resolveDirectDownloadUrl(url) {
+  if (!url) return url;
+  const idMatch = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/) || url.match(/drive\.google\.com\/open\?id=([\w-]+)/);
+  if (idMatch) return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+  return url;
+}
+
+module.exports = { makeSlug, genActivationCode, genCertCode, formatVND, formatDate, embedVideoInfo, embedPdfUrl, resolveDirectDownloadUrl };

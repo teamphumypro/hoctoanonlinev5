@@ -11,6 +11,7 @@
       <% if (book.short_desc) { %><p class="text-muted"><%= book.short_desc %></p><% } %>
       <% if (book.description) { %><div><%- book.description %></div><% } %>
     </div>
+    <% if (!book.file_url) { %>
     <div class="card p-3">
       <h6 class="fw-bold mb-2">Danh sách chương (<%= chapters.length %>)</h6>
       <ul class="list-group list-group-flush">
@@ -24,6 +25,7 @@
         <% if (chapters.length === 0) { %><li class="list-group-item text-muted">Chưa có chương nào.</li><% } %>
       </ul>
     </div>
+    <% } %>
   </div>
   <div class="col-lg-4">
     <div class="card p-3" style="position:sticky; top:80px">

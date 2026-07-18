@@ -379,6 +379,9 @@ CREATE TABLE IF NOT EXISTS online_books (
   is_published INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+-- BO SUNG: doc sach truc tiep tu 1 file PDF (upload hoac dan link bat ky), khong bat buoc phai tach chuong
+ALTER TABLE online_books ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE online_books ADD COLUMN IF NOT EXISTS file_source TEXT; -- 'upload' hoac 'link'
 CREATE TABLE IF NOT EXISTS online_book_chapters (
   id SERIAL PRIMARY KEY,
   online_book_id INTEGER NOT NULL REFERENCES online_books(id) ON DELETE CASCADE,

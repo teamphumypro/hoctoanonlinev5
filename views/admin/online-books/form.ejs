@@ -27,6 +27,29 @@
     </div>
 
     <div class="card p-4 mb-3">
+      <h6 class="fw-bold mb-3">File sách (đọc kiểu lật trang)</h6>
+      <div class="alert alert-info small mb-3">
+        Chỉ cần <b>1 file PDF duy nhất</b> — không cần tách chương. Bạn có thể tải file lên trực tiếp,
+        hoặc dán link file PDF đang lưu ở bất kỳ nơi nào (Google Drive, Dropbox, CDN riêng...).
+        Nếu dùng link Google Drive, nhớ bật chia sẻ "Bất kỳ ai có đường liên kết".
+      </div>
+      <% if (book && book.file_url) { %>
+        <div class="mb-2 small">Đang dùng: <span class="badge bg-<%= book.file_source === 'upload' ? 'secondary' : 'info' %>"><%= book.file_source === 'upload' ? 'File đã tải lên' : 'Link dán tay' %></span>
+          <% if (book.file_source !== 'upload') { %> — <a href="<%= book.file_url %>" target="_blank" rel="noopener"><%= book.file_url %></a><% } %>
+        </div>
+      <% } %>
+      <div class="btn-group btn-group-sm mb-2" role="group">
+        <input type="radio" class="btn-check" name="file_mode" id="fileModeUpload" checked>
+        <label class="btn btn-outline-secondary" for="fileModeUpload">Tải file PDF lên</label>
+        <input type="radio" class="btn-check" name="file_mode" id="fileModeLink">
+        <label class="btn btn-outline-secondary" for="fileModeLink">Dán link file PDF</label>
+      </div>
+      <div id="bookFileUploadField"><input type="file" name="book_file" class="form-control" accept="application/pdf,.pdf"></div>
+      <div id="bookFileLinkField" class="d-none"><input type="url" name="book_file_link" class="form-control" placeholder="https://drive.google.com/file/d/.../view hoặc https://.../sach.pdf"></div>
+      <div class="form-text">Để trống nếu chưa muốn thay đổi file hiện tại.</div>
+    </div>
+
+    <div class="card p-4 mb-3">
       <h6 class="fw-bold mb-3">Ảnh bìa</h6>
       <% if (book && book.cover_url) { %><div class="mb-2"><img src="<%= book.cover_url %>" style="height:80px;border-radius:6px"></div><% } %>
       <div class="btn-group btn-group-sm mb-2" role="group">
@@ -59,6 +82,13 @@
   document.getElementById('coverModeLink').addEventListener('change', () => { cl.classList.remove('d-none'); cu.classList.add('d-none'); });
   <% if (book && book.cover_url && book.cover_url.startsWith('http')) { %>
     document.getElementById('coverModeLink').checked = true; cl.classList.remove('d-none'); cu.classList.add('d-none');
+  <% } %>
+
+  const bfu = document.getElementById('bookFileUploadField'), bfl = document.getElementById('bookFileLinkField');
+  document.getElementById('fileModeUpload').addEventListener('change', () => { bfu.classList.remove('d-none'); bfl.classList.add('d-none'); });
+  document.getElementById('fileModeLink').addEventListener('change', () => { bfl.classList.remove('d-none'); bfu.classList.add('d-none'); });
+  <% if (book && book.file_source === 'link') { %>
+    document.getElementById('fileModeLink').checked = true; bfl.classList.remove('d-none'); bfu.classList.add('d-none');
   <% } %>
 
   const descQuill = new Quill('#descEditor', {

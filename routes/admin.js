@@ -17,7 +17,7 @@ const adminBookController = require('../controllers/adminBookController');
 const adminOnlineBookController = require('../controllers/adminOnlineBookController');
 
 const { requireAdminLogin, requireRole } = require('../middleware/auth');
-const { uploadThumbnail, uploadVideo, uploadFile, uploadExamDoc } = require('../middleware/upload');
+const { uploadThumbnail, uploadVideo, uploadFile, uploadExamDoc, uploadOnlineBookForm } = require('../middleware/upload');
 
 // ---- Dang nhap rieng cho quan tri / giang vien / tro giang ----
 router.get('/dang-nhap', authController.showAdminLogin);
@@ -71,9 +71,19 @@ router.post('/sach/:id/xoa', requireRole('admin'), adminBookController.delete);
 // ---- Doc sach online (TACH RIENG HOAN TOAN voi Sach) ----
 router.get('/doc-sach-online', requireRole('teacher'), adminOnlineBookController.list);
 router.get('/doc-sach-online/them-moi', requireRole('teacher'), adminOnlineBookController.newForm);
-router.post('/doc-sach-online', requireRole('teacher'), uploadThumbnail.single('cover'), adminOnlineBookController.create);
+router.post('/doc-sach-online', requireRole('teacher'), (req, res, next) => {
+  uploadOnlineBookForm(req, res, (err) => {
+    if (err) return res.status(400).send(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">Lỗi khi tải file lên: ${err.message}</pre>`);
+    next();
+  });
+}, adminOnlineBookController.create);
 router.get('/doc-sach-online/:id/sua', requireRole('teacher'), adminOnlineBookController.editForm);
-router.post('/doc-sach-online/:id', requireRole('teacher'), uploadThumbnail.single('cover'), adminOnlineBookController.update);
+router.post('/doc-sach-online/:id', requireRole('teacher'), (req, res, next) => {
+  uploadOnlineBookForm(req, res, (err) => {
+    if (err) return res.status(400).send(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;color:#b5433a">Lỗi khi tải file lên: ${err.message}</pre>`);
+    next();
+  });
+}, adminOnlineBookController.update);
 router.post('/doc-sach-online/:id/xoa', requireRole('admin'), adminOnlineBookController.delete);
 
 router.get('/doc-sach-online/:id/chuong', requireRole('teacher'), adminOnlineBookController.chapters);
