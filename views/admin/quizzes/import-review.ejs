@@ -27,7 +27,7 @@
   <% questions.forEach((q, i) => { %>
     <div class="card p-0 mb-3 question-row overflow-hidden" data-index="<%= i %>">
       <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-white">
-        <span class="fw-bold">Câu <%= i+1 %> <%= q.needsReview ? '<span class="badge bg-warning text-dark ms-1">Cần kiểm tra lại</span>' : '' %></span>
+        <span class="fw-bold">Câu <%= i+1 %><% if (q.needsReview) { %><span class="badge bg-warning text-dark ms-1">Cần kiểm tra lại</span><% } %></span>
         <label class="small d-flex align-items-center gap-1 mb-0">
           <input type="checkbox" name="questions[<%= i %>][include]" checked> Giữ câu này
         </label>
@@ -69,7 +69,8 @@
 
           <!-- Trac nghiem 1 dap an -->
           <div class="q-fields" data-type="single_choice" style="<%= q.type!=='single_choice'?'display:none':'' %>">
-            <% for (let k = 0; k < 4; k++) { %>
+            <% var optionCount = Math.max(4, Math.min(8, (q.options || []).length || 4)); %>
+            <% for (let k = 0; k < optionCount; k++) { %>
               <div class="d-flex align-items-center gap-2 mb-1">
                 <input type="radio" name="questions[<%= i %>][correct_index]" value="<%= k %>" class="q-correct-index" <%= (q.correctIndex===k)?'checked':(k===0 && q.correctIndex===undefined?'checked':'') %>>
                 <input name="questions[<%= i %>][options][]" class="form-control form-control-sm q-option" value="<%= (q.options && q.options[k]) ? q.options[k] : '' %>" placeholder="Phương án <%= String.fromCharCode(65+k) %>">
@@ -115,7 +116,7 @@
 <script>window.MathJax = { tex: { inlineMath: [['$','$']] }, startup: { typeset: false } };</script>
 <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
 <script>
-  const letters = ['A', 'B', 'C', 'D'];
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
   function renderPreview(row) {
     const type = row.querySelector('.q-type').value;

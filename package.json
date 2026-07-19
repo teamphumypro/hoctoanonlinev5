@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "test": "node tests/examParser.test.js"
   },
   "dependencies": {
     "pg": "^8.11.5",
@@ -31,5 +32,9 @@
     "fast-xml-parser": "^4.4.1",
     "emf-converter": "^1.1.7",
     "@napi-rs/canvas": "^0.1.53"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
   }
 }
