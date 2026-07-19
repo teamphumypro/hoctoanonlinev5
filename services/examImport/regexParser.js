@@ -182,7 +182,9 @@ function parseExamText(rawText, images = []) {
     }
 
     // ---- Phan I (hoac de khong ghi ro Phan): Trac nghiem 1 dap an, hoac tu luan neu khong co A/B/C/D ----
-    const optionRegex = /\n?\s*([A-D])[\.\)]\s*(.+?)(?=\n\s*[A-D][\.\)]|$)/gs;
+    // Phuong an co the xuong dong rieng (A.\nB.\nC.\nD.) HOAC nam chung 1 dong cach nhau bang Tab
+    // (A. ... \t B. ... \t C. ... \t D. ...) - ca 2 kieu deu gap trong de thi thuc te
+    const optionRegex = /[\n\t]?\s*([A-D])[\.\)]\s*(.+?)(?=[\n\t]\s*[A-D][\.\)]|$)/gs;
     const options = [];
     let om;
     while ((om = optionRegex.exec(body)) !== null) {
