@@ -9,6 +9,10 @@ FROM node:20-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-draw \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-vie \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

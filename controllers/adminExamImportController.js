@@ -84,13 +84,13 @@ exports.save = async (req, res) => {
     const explanation = (row.explanation || '').trim() || null;
 
     if (row.type === 'single_choice') {
-      const options = Array.isArray(row.options) ? row.options : (row.options != null ? [row.options] : []);
+      const options = row.options || [];
       const correctIndex = parseInt(row.correct_index);
       await Quiz.addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex: isNaN(correctIndex) ? 0 : correctIndex, explanation });
 
     } else if (row.type === 'true_false') {
-      const contents = Array.isArray(row.tf_content) ? row.tf_content : (row.tf_content != null ? [row.tf_content] : []);
-      const corrects = Array.isArray(row.tf_correct) ? row.tf_correct.map(String) : (row.tf_correct != null ? [String(row.tf_correct)] : []);
+      const contents = row.tf_content || [];
+      const corrects = row.tf_correct || [];
       const items = contents.map((content, i) => ({ content, is_correct: corrects.includes(String(i)) }));
       await Quiz.addTrueFalseQuestion({ quiz_id, question, points, items, explanation });
 

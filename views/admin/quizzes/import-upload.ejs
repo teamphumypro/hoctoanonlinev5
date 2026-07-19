@@ -1,42 +1,58 @@
-<% var pageTitle = 'Tải đề thi từ file' %>
+<% var pageTitle = 'Nhập đề tự động' %>
 <%- include('../../partials/admin-header') %>
 
-<div class="card p-4" style="max-width:600px">
-  <h6 class="fw-bold mb-1">Tải đề thi từ file Word/PDF hoặc link Google Drive</h6>
-  <p class="small text-muted mb-3">Bài kiểm tra: <strong><%= quiz.title %></strong></p>
-
-  <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
-
-  <div class="alert alert-warning small">
-    <strong>Khuyến nghị để giống quy trình Azota:</strong> ưu tiên file <strong>.docx gốc</strong>. Hệ thống giữ ảnh nhúng và công thức Word Equation; công thức MathType cũ dạng WMF/EMF sẽ được chuyển sang ảnh khi máy chủ có LibreOffice. PDF chỉ đọc tốt khi có lớp chữ thật; PDF scan và ảnh dùng OCR nên cần rà soát kỹ. Sau khi tải lên, màn hình sẽ chia đôi: <strong>bên trái là đề thực tế, bên phải là mã nhập liệu</strong>; bạn có thể sửa, chọn đáp án, chia điểm và kiểm tra lỗi trước khi lưu.
+<div class="card border-0 shadow-sm overflow-hidden">
+  <div class="p-4 text-white" style="background:linear-gradient(135deg,#2146b8,#4b6ee8)">
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> Nhập đề tự động</h4>
+    <div class="opacity-75">Đưa file đề có sẵn lên, hệ thống tự tách câu hỏi, đáp án và lời giải chi tiết.</div>
   </div>
-
-  <form method="POST" action="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" enctype="multipart/form-data">
-    <div class="mb-3">
-      <label class="form-label">Chọn file đề thi (.docx, .pdf, .xlsx hoặc ảnh .jpg/.png)</label>
-      <input type="file" name="exam_file" class="form-control" accept=".docx,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp">
-    </div>
-    <div class="mb-3 text-center text-muted small">— hoặc —</div>
-    <div class="mb-3">
-      <label class="form-label">Dán link Google Drive</label>
-      <input type="url" name="drive_link" class="form-control" placeholder="https://drive.google.com/file/d/.../view">
+  <div class="p-4">
+    <div class="mb-4">
+      <div class="fw-semibold"><%= quiz.title %></div>
+      <div class="small text-muted">Hỗ trợ đề trắc nghiệm, đúng/sai, trả lời ngắn và tự luận.</div>
     </div>
 
-    <% if (aiConfigured) { %>
-      <div class="form-check mb-3">
-        <input type="checkbox" name="use_ai" class="form-check-input" id="useAi" checked>
-        <label class="form-check-label" for="useAi">Dùng AI để nhận diện thông minh hơn (chính xác hơn, tốn phí nhỏ theo API Key bạn đã cấu hình)</label>
-      </div>
-    <% } else { %>
-      <div class="alert alert-secondary small">
-        Chưa cấu hình AI API Key nên hệ thống sẽ chỉ dò theo mẫu thông thường (độ chính xác thấp hơn).
-        Vào <a href="/admin/cai-dat/ai">Cài đặt AI</a> để bật tính năng nhận diện thông minh hơn.
-      </div>
-    <% } %>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
 
-    <button class="btn btn-primary">Tải lên và phân tích</button>
-    <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary">Hủy</a>
-  </form>
+    <form method="POST" action="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" enctype="multipart/form-data" id="uploadForm">
+      <label class="w-100 border rounded-3 p-5 text-center mb-3" style="border-style:dashed!important;cursor:pointer;background:#f8faff" id="dropZone">
+        <input type="file" name="exam_file" id="examFile" class="d-none" accept=".docx,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp">
+        <div class="fs-1 text-primary mb-2"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        <div class="fw-bold">Chọn hoặc kéo thả file vào đây</div>
+        <div class="small text-muted mt-1">Word .docx · PDF chữ hoặc PDF scan · Ảnh JPG/PNG · tối đa 20MB</div>
+        <div class="small text-primary mt-3" id="fileName">Chưa chọn file</div>
+      </label>
+
+      <div class="text-center text-muted small mb-3">hoặc dán đường dẫn Google Drive công khai</div>
+      <input type="url" name="drive_link" class="form-control mb-3" placeholder="https://drive.google.com/file/d/.../view">
+
+      <% if (aiConfigured) { %>
+        <div class="form-check form-switch mb-3">
+          <input type="checkbox" name="use_ai" class="form-check-input" id="useAi">
+          <label class="form-check-label" for="useAi"><strong>Dùng AI hỗ trợ</strong> khi bố cục file quá đặc biệt hoặc OCR bị lộn xộn</label>
+        </div>
+      <% } %>
+
+      <div class="alert alert-info small">
+        <strong>Cách hệ thống xử lý:</strong> giữ hình và công thức trong Word, tự nhận diện các phần của đề, đọc bảng đáp án cuối file, ghép đúng lời giải với từng câu, sau đó mở màn hình hai cột để sửa trực tiếp trước khi lưu.
+      </div>
+
+      <button class="btn btn-primary px-4" id="submitBtn"><i class="fa-solid fa-bolt"></i> Phân tích đề ngay</button>
+      <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary">Hủy</a>
+    </form>
+  </div>
 </div>
 
+<script>
+const fileInput = document.getElementById('examFile');
+const fileName = document.getElementById('fileName');
+const zone = document.getElementById('dropZone');
+fileInput.addEventListener('change', () => fileName.textContent = fileInput.files[0] ? fileInput.files[0].name : 'Chưa chọn file');
+['dragenter','dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.style.background='#eef3ff'; }));
+['dragleave','drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.style.background='#f8faff'; }));
+zone.addEventListener('drop', e => { if (e.dataTransfer.files.length) { fileInput.files=e.dataTransfer.files; fileName.textContent=fileInput.files[0].name; } });
+document.getElementById('uploadForm').addEventListener('submit', () => {
+  const b=document.getElementById('submitBtn'); b.disabled=true; b.innerHTML='<span class="spinner-border spinner-border-sm"></span> Đang đọc và nhận diện đề...';
+});
+</script>
 <%- include('../../partials/admin-footer') %>

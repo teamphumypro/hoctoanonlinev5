@@ -1,16 +1,9 @@
 services:
   - type: web
     name: hoctoanonlinev5
-    runtime: node
-    plan: free
-    buildCommand: npm ci --omit=dev
-    startCommand: npm run migrate && npm start
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: 20.18.0
-      - key: NPM_CONFIG_PRODUCTION
-        value: "true"
-      - key: DATABASE_URL
-        sync: false
-      - key: SESSION_SECRET
-        sync: false

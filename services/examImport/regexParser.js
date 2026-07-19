@@ -23,39 +23,100 @@ function extractAnswerKey(text) {
 // Phan I (trac nghiem 1 dap an): "Cau 1 2 3 ... Dap an D B B ..."
 // Phan II (dung/sai 4 y a,b,c,d): "Cau a b c d" roi tung dong "Cau 1 D S S D"
 // Phan III (tra loi ngan): "Cau 1 2 3 ... Dap an 3456 2656 ..."
+function cleanLines(text) {
+  return (text || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+}
+
+// Đọc bảng đáp án kể cả khi Word tách từng ô của bảng thành một dòng riêng.
+// Đây là kiểu xuất hiện trong các đề Bộ GD: Phần I/II/III + bảng đáp án + lời giải ngay phía sau.
 function parseAnswerKeySections(answerKeyText) {
   const part1 = {}, part2 = {}, part3 = {};
   if (!answerKeyText) return { part1, part2, part3 };
+  const lines = cleanLines(answerKeyText);
+  const norm = v => v.normalize('NFC');
 
-  // Phan I: cau so + dap an la 1 chu cai A-D (chi lay doan TRUOC "Phan II" neu co, tranh dinh sang phan sau)
-  const beforePart2 = answerKeyText.split(/Phần\s*II\b/i)[0];
-  const p1Match = beforePart2.match(/Câu\s+((?:\d+\s+)+\d+)\s*Đáp\s*án\s+((?:[A-D]\s*)+[A-D])/i);
-  if (p1Match) {
-    const nums = p1Match[1].trim().split(/\s+/).map(Number);
-    const letters = p1Match[2].trim().split(/\s+/);
-    nums.forEach((n, i) => { if (letters[i]) part1[n] = letters[i].toUpperCase(); });
+  function sectionRange(label, nextLabels) {
+    const start = lines.findIndex(x => new RegExp(`^Phần\\s*${label}\\b`, 'i').test(x));
+    if (start < 0) return [];
+    let end = lines.length;
+    for (let i = start + 1; i < lines.length; i++) {
+      if (nextLabels.some(l => new RegExp(`^Phần\\s*${l}\\b`, 'i').test(lines[i]))) { end = i; break; }
+      // Lời giải bắt đầu bằng PHẦN I in hoa sau khi đã đi qua bảng Phần III.
+      if (label === 'III' && /^PHẦN\s*I\b/.test(lines[i])) { end = i; break; }
+    }
+    return lines.slice(start, end);
   }
 
-  // Phan II: "Cau a b c d" (dong tieu de) roi cac dong "Cau N D S S D" hoac "Cau N Đ Đ S Đ"
-  const p2Regex = /Câu\s+(\d+)\s+([ĐSDS])\s+([ĐSDS])\s+([ĐSDS])\s+([ĐSDS])/g;
-  let m2;
-  while ((m2 = p2Regex.exec(answerKeyText)) !== null) {
-    const toBool = v => v === 'Đ' || v === 'D';
-    part2[parseInt(m2[1])] = [toBool(m2[2]), toBool(m2[3]), toBool(m2[4]), toBool(m2[5])];
-  }
+  const p1 = sectionRange('I', ['II']);
+  const p2 = sectionRange('II', ['III']);
+  const p3 = sectionRange('III', []);
 
-  // Phan III: cau so + dap an la gia tri tu do (so/thap phan/phan so...), nam sau "Phan III"
-  const afterPart3 = answerKeyText.match(/Phần\s*III\b[\s\S]*/i);
-  if (afterPart3) {
-    const p3Match = afterPart3[0].match(/Câu\s+((?:\d+\s+)+\d+)\s*Đáp\s*án\s+([\s\S]+?)(?=\n\s*(?:LỜI|HƯỚNG|$))/i);
-    if (p3Match) {
-      const nums = p3Match[1].trim().split(/\s+/).map(Number);
-      const values = p3Match[2].trim().split(/\s+/);
-      nums.forEach((n, i) => { if (values[i]) part3[n] = values[i]; });
+  // Phần I: tìm chuỗi số sau "Câu", và chuỗi A-D sau "Đáp án".
+  const p1Cau = p1.findIndex(x => /^Câu$/i.test(x));
+  const p1Ans = p1.findIndex(x => /^Đáp\s*án$/i.test(x));
+  if (p1Cau >= 0 && p1Ans > p1Cau) {
+    const nums = p1.slice(p1Cau + 1, p1Ans).filter(x => /^\d{1,3}$/.test(x)).map(Number);
+    const vals = p1.slice(p1Ans + 1).filter(x => /^[A-D]$/i.test(x)).map(x => x.toUpperCase());
+    nums.forEach((n, i) => { if (vals[i]) part1[n] = vals[i]; });
+  } else {
+    const compact = p1.join(' ');
+    const m = compact.match(/Câu\s+((?:\d+\s+)+\d+)\s*Đáp\s*án\s+((?:[A-D]\s*)+)/i);
+    if (m) {
+      const nums = m[1].trim().split(/\s+/).map(Number);
+      const vals = m[2].trim().split(/\s+/);
+      nums.forEach((n, i) => { if (vals[i]) part1[n] = vals[i].toUpperCase(); });
     }
   }
 
+  // Phần II: Word thường tách "Câu 1", Đ, S, Đ, Đ thành 5 dòng liên tiếp.
+  for (let i = 0; i < p2.length; i++) {
+    const m = p2[i].match(/^Câu\s*(\d+)$/i);
+    if (!m) continue;
+    const vals = [];
+    for (let j = i + 1; j < p2.length && vals.length < 4; j++) {
+      const v = norm(p2[j]).toUpperCase();
+      if (/^[ĐDS]$/.test(v)) vals.push(v === 'Đ' || v === 'D');
+      else if (/^Câu\s*\d+/i.test(p2[j])) break;
+    }
+    if (vals.length === 4) part2[Number(m[1])] = vals;
+  }
+  // Dự phòng cho bảng bị ép thành một dòng.
+  const p2Compact = p2.join(' ');
+  const p2Regex = /Câu\s+(\d+)\s+([ĐDS])\s+([ĐDS])\s+([ĐDS])\s+([ĐDS])/gi;
+  let m2;
+  while ((m2 = p2Regex.exec(p2Compact))) {
+    const b = v => v.toUpperCase() === 'Đ' || v.toUpperCase() === 'D';
+    part2[Number(m2[1])] = [b(m2[2]), b(m2[3]), b(m2[4]), b(m2[5])];
+  }
+
+  // Phần III: các số câu rồi tới các giá trị đáp án tự do.
+  const p3Cau = p3.findIndex(x => /^Câu$/i.test(x));
+  const p3Ans = p3.findIndex(x => /^Đáp\s*án$/i.test(x));
+  if (p3Cau >= 0 && p3Ans > p3Cau) {
+    const nums = p3.slice(p3Cau + 1, p3Ans).filter(x => /^\d{1,3}$/.test(x)).map(Number);
+    const vals = p3.slice(p3Ans + 1).filter(x => !/^PHẦN\s*I\b/.test(x));
+    nums.forEach((n, i) => { if (vals[i] != null) part3[n] = vals[i]; });
+  }
+
   return { part1, part2, part3 };
+}
+
+// Tách phần bảng đáp án và phần lời giải trong tài liệu có cấu trúc:
+// ĐÁP ÁN THAM KHẢO -> Phần I/II/III (bảng) -> PHẦN I -> Câu 1... (lời giải).
+function splitAnswerKeyAndSolutions(tail) {
+  if (!tail) return { answerKeyText: '', solutionText: '' };
+  const lines = tail.split('\n');
+  let seenPart3 = false;
+  let solutionIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*Phần\s*III\b/i.test(lines[i])) seenPart3 = true;
+    if (seenPart3 && /^\s*PHẦN\s*I\b/.test(lines[i])) { solutionIndex = i; break; }
+  }
+  if (solutionIndex < 0) return { answerKeyText: tail, solutionText: '' };
+  return {
+    answerKeyText: lines.slice(0, solutionIndex).join('\n'),
+    solutionText: lines.slice(solutionIndex).join('\n')
+  };
 }
 
 // Voi kieu de ghi dap an NGAY SAU tung cau (vd "Dap an: 6,19"), tach lay gia tri dap an do ra
@@ -87,20 +148,36 @@ function parseSolutions(solutionText) {
   const solutions = { 1: {}, 2: {}, 3: {} };
   if (!solutionText) return solutions;
 
-  const blocks = solutionText.split(/\n(?=Câu\s*\d{1,3}[\.\:\)])/i);
+  const lines = solutionText.split('\n');
   let part = 1;
-  for (const block of blocks) {
-    const partMatch = block.match(/PHẦN\s*(I{1,3}|[123])\b/i);
-    if (partMatch) {
-      const p = partMatch[1].toUpperCase();
-      part = (p === 'I' || p === '1') ? 1 : (p === 'II' || p === '2') ? 2 : 3;
+  let currentNumber = null;
+  let buffer = [];
+  const flush = () => {
+    if (currentNumber == null) return;
+    const content = buffer.join('\n').trim();
+    if (content) solutions[part][currentNumber] = content;
+    buffer = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    const pm = line.match(/^PHẦN\s*(I{1,3}|[123])\b/i);
+    if (pm) {
+      flush(); currentNumber = null;
+      const token = pm[1].toUpperCase();
+      part = token === 'I' || token === '1' ? 1 : token === 'II' || token === '2' ? 2 : 3;
+      continue;
     }
-    const headerMatch = block.match(/^Câu\s*(\d{1,3})[\.\:\)]\s*/i);
-    if (!headerMatch) continue;
-    const qNumber = parseInt(headerMatch[1]);
-    const content = block.slice(headerMatch[0].length).trim().replace(/\n+/g, '\n');
-    if (content) solutions[part][qNumber] = content;
+    const qm = line.match(/^Câu\s*(\d{1,3})[\.\:\)]?\s*(.*)$/i);
+    if (qm) {
+      flush();
+      currentNumber = Number(qm[1]);
+      buffer = qm[2] ? [qm[2]] : [];
+      continue;
+    }
+    if (currentNumber != null) buffer.push(raw);
   }
+  flush();
   return solutions;
 }
 
@@ -108,21 +185,23 @@ function parseExamText(rawText, images = []) {
   const { restoreImages } = require('./extractText');
   let text = normalizeText(rawText);
 
-  // Tach rieng phan "LOI GIAI THAM KHAO" ra khoi phan de bai (KHONG con vut bo nhu truoc —
-  // gan lai lam "loi giai chi tiet" cho tung cau, giong cau truc "de + dap an + loi giai" cua Azota)
   let solutions = { 1: {}, 2: {}, 3: {} };
-  const solutionMatch = text.match(/\n\s*(LỜI\s*GIẢI(\s*THAM\s*KHẢO)?|HƯỚNG\s*DẪN\s*GIẢI)\b/i);
-  if (solutionMatch) {
-    solutions = parseSolutions(text.slice(solutionMatch.index));
-    text = text.slice(0, solutionMatch.index);
-  }
-
-  // Tach rieng bang dap an gop cuoi bai (neu co) ra khoi phan de bai, roi phan tich theo dung 3 phan chuan
   let answerKeyText = '';
+
+  // Ưu tiên mốc ĐÁP ÁN: phần sau mốc có thể chứa cả bảng đáp án lẫn lời giải.
   const akMatch = text.match(/\n\s*(ĐÁP\s*ÁN(\s*THAM\s*KHẢO)?|BẢNG\s*ĐÁP\s*ÁN)\b/i);
   if (akMatch) {
-    answerKeyText = text.slice(akMatch.index);
+    const tail = text.slice(akMatch.index);
+    const split = splitAnswerKeyAndSolutions(tail);
+    answerKeyText = split.answerKeyText;
+    if (split.solutionText) solutions = parseSolutions(split.solutionText);
     text = text.slice(0, akMatch.index);
+  } else {
+    const solutionMatch = text.match(/\n\s*(LỜI\s*GIẢI(\s*THAM\s*KHẢO)?|HƯỚNG\s*DẪN\s*GIẢI)\b/i);
+    if (solutionMatch) {
+      solutions = parseSolutions(text.slice(solutionMatch.index));
+      text = text.slice(0, solutionMatch.index);
+    }
   }
   const { part1: keyPart1, part2: keyPart2, part3: keyPart3 } = parseAnswerKeySections(answerKeyText);
   const legacyKey = extractAnswerKey(answerKeyText || text); // du phong cho de khong theo dung chuan 3 phan
@@ -157,6 +236,8 @@ function parseExamText(rawText, images = []) {
       const corrects = keyPart2[qNumber] || [];
       questions.push({
         type: 'true_false',
+        part: 2,
+        questionNumber: qNumber,
         question: questionText || `(Câu ${qNumber} — chưa nhận diện được nội dung, vui lòng sửa lại)`,
         points: 1,
         items: itemTexts.map((t, i) => ({ content: restoreImages(t, images), is_correct: corrects[i] === true })),
@@ -172,6 +253,8 @@ function parseExamText(rawText, images = []) {
       const answer = keyPart3[qNumber] || inlineAnswer || '';
       questions.push({
         type: 'short_answer',
+        part: 3,
+        questionNumber: qNumber,
         question: questionText || `(Câu ${qNumber} — chưa nhận diện được nội dung)`,
         points: 0.5,
         correct_answer: answer,
@@ -197,6 +280,8 @@ function parseExamText(rawText, images = []) {
       const correctIndex = correctLetter ? options.findIndex(o => o.letter === correctLetter) : -1;
       questions.push({
         type: 'single_choice',
+        part: currentPart || 1,
+        questionNumber: qNumber,
         question: questionText || `(Câu ${qNumber} — chưa nhận diện được nội dung, vui lòng sửa lại)`,
         points: 0.25,
         options: options.map(o => o.text),
@@ -207,6 +292,8 @@ function parseExamText(rawText, images = []) {
     } else if (inlineAnswer) {
       questions.push({
         type: 'short_answer',
+        part: currentPart || 1,
+        questionNumber: qNumber,
         question: questionText || restoreImages(body.trim().replace(/\n+/g, ' '), images) || `(Câu ${qNumber} — chưa nhận diện được nội dung)`,
         points: 0.5,
         correct_answer: inlineAnswer,
@@ -216,6 +303,8 @@ function parseExamText(rawText, images = []) {
     } else {
       questions.push({
         type: 'essay',
+        part: currentPart || 1,
+        questionNumber: qNumber,
         question: questionText || restoreImages(body.trim().replace(/\n+/g, ' '), images) || `(Câu ${qNumber} — chưa nhận diện được nội dung)`,
         points: 1,
         explanation,
