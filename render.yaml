@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: hoctoanonlinev5
+    runtime: node
+    plan: free
+    buildCommand: rm -rf node_modules && npm ci --omit=dev --no-audit --no-fund
+    startCommand: npm run migrate && npm run seed && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      - key: NPM_CONFIG_AUDIT
+        value: "false"
+      - key: NPM_CONFIG_FUND
+        value: "false"

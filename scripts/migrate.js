@@ -1,4 +1,7 @@
-require('dotenv').config();
+try { require('dotenv').config(); } catch (err) {
+  if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  console.warn('[env] dotenv not installed; using Render/system environment variables.');
+}
 const fs = require('fs');
 const path = require('path');
 const db = require('../config/db');
