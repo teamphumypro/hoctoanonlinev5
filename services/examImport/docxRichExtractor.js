@@ -32,6 +32,13 @@ async function extractDocxRich(filePath) {
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', preserveOrder: true, trimValues: false });
   const parsedDoc = parser.parse(documentXml);
 
+  // Cong thuc MathType kieu cu (Equation.DSMT4) luu anh xem truoc dang WMF - trinh duyet khong
+  // hien thi truc tiep duoc dinh dang nay. Chuyen doi hang loat sang PNG bang LibreOffice (neu server
+  // co cai) TRUOC KHI duyet van ban, de tranh phai mo LibreOffice nhieu lan (rat cham). Neu server
+  // khong co LibreOffice (vd dang chay kieu Node buildpack thong thuong, khong dung Dockerfile),
+  // se tu dong bo qua buoc nay va hien placeholder chu de nguoi dung tu sua tay, khong lam vo ca file.
+  const wmfConvertedMap = await convertAllWmfImages(zip, relMap);
+
   const images = [];
   let text = '';
 
@@ -77,13 +84,27 @@ async function extractDocxRich(filePath) {
     if (!target) return;
     if (!target.startsWith('media/')) target = 'media/' + target.split('/').pop();
     const imgPath = 'word/' + target;
+    const extMatch = target.match(/\.(\w+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+
+    if (ext === 'emf' || ext === 'wmf') {
+      // Cong thuc MathType kieu cu: dung ban da chuyen doi san (neu LibreOffice co san tren server)
+      const converted = wmfConvertedMap[imgPath];
+      if (converted) {
+        const idx = images.length;
+        images.push(`data:image/png;base64,${converted}`);
+        text += `[[IMG:${idx}]]`;
+      } else {
+        // Khong co LibreOffice tren server -> khong the hien anh, chen chu bao ro thay vi mat trang im lang
+        text += ' [công thức - chưa hiển thị được, vui lòng sửa tay] ';
+      }
+      return;
+    }
+
     const imgFile = zip.file(imgPath);
     if (!imgFile) return;
     const b64 = await imgFile.async('base64');
-    const extMatch = target.match(/\.(\w+)$/);
-    const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
-    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'emf' || ext === 'wmf' ? 'image/png' : 'image/png';
-    if (ext === 'emf' || ext === 'wmf') return; // dinh dang vector cu cua Windows, trinh duyet khong hien duoc, bo qua
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : 'image/png';
     const idx = images.length;
     images.push(`data:${mime};base64,${b64}`);
     text += `[[IMG:${idx}]]`;
@@ -142,6 +163,57 @@ async function extractDocxRich(filePath) {
   });
 
   return { text, images };
+}
+
+// Chuyen doi hang loat cac anh cong thuc dang WMF/EMF sang PNG trong 1 lan goi LibreOffice duy nhat
+// (nhanh hon nhieu so voi mo LibreOffice rieng cho tung anh). Neu server khong co LibreOffice
+// (lenh "soffice" khong ton tai), tra ve map rong va KHONG bao loi - de ham goi tu dong dung
+// phuong an du phong (hien chu bao thay vi anh).
+async function convertAllWmfImages(zip, relMap) {
+  const path = require('path');
+  const os = require('os');
+  const { execFile } = require('child_process');
+
+  const wmfTargets = Object.values(relMap)
+    .filter(t => /\.(wmf|emf)$/i.test(t))
+    .map(t => t.startsWith('media/') ? 'word/' + t : 'word/media/' + t.split('/').pop());
+  const uniqueTargets = [...new Set(wmfTargets)];
+  if (uniqueTargets.length === 0) return {};
+
+  let tmpDir;
+  try {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmfconv-'));
+    const writtenPaths = [];
+    for (const target of uniqueTargets) {
+      const f = zip.file(target);
+      if (!f) continue;
+      const buf = await f.async('nodebuffer');
+      const localName = path.basename(target).replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const localPath = path.join(tmpDir, localName);
+      fs.writeFileSync(localPath, buf);
+      writtenPaths.push({ target, localPath, localName });
+    }
+    if (writtenPaths.length === 0) return {};
+
+    await new Promise((resolve) => {
+      execFile('soffice', ['--headless', '--convert-to', 'png', '--outdir', tmpDir, ...writtenPaths.map(w => w.localPath)],
+        { timeout: 180000 }, (err) => resolve(err)); // du co loi cung resolve, khong reject, de luon roi vao nhanh du phong ben duoi
+    });
+
+    const result = {};
+    for (const w of writtenPaths) {
+      const pngPath = path.join(tmpDir, w.localName.replace(/\.(wmf|emf)$/i, '.png'));
+      if (fs.existsSync(pngPath)) {
+        result[w.target] = fs.readFileSync(pngPath).toString('base64');
+      }
+    }
+    return result;
+  } catch (err) {
+    console.error('Khong chuyen doi duoc cong thuc WMF (co the server chua cai LibreOffice):', err.message);
+    return {};
+  } finally {
+    if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {} }
+  }
 }
 
 module.exports = { extractDocxRich };

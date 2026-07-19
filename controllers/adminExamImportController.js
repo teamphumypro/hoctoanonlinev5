@@ -81,23 +81,24 @@ exports.save = async (req, res) => {
     const points = parseFloat(row.points) || 0.25;
     const question = (row.question || '').trim();
     if (!question) continue;
+    const explanation = (row.explanation || '').trim() || null;
 
     if (row.type === 'single_choice') {
       const options = row.options || [];
       const correctIndex = parseInt(row.correct_index);
-      await Quiz.addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex: isNaN(correctIndex) ? 0 : correctIndex });
+      await Quiz.addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex: isNaN(correctIndex) ? 0 : correctIndex, explanation });
 
     } else if (row.type === 'true_false') {
       const contents = row.tf_content || [];
       const corrects = row.tf_correct || [];
       const items = contents.map((content, i) => ({ content, is_correct: corrects.includes(String(i)) }));
-      await Quiz.addTrueFalseQuestion({ quiz_id, question, points, items });
+      await Quiz.addTrueFalseQuestion({ quiz_id, question, points, items, explanation });
 
     } else if (row.type === 'short_answer') {
-      await Quiz.addShortAnswerQuestion({ quiz_id, question, points, correct_answer: row.correct_answer || '' });
+      await Quiz.addShortAnswerQuestion({ quiz_id, question, points, correct_answer: row.correct_answer || '', explanation });
 
     } else if (row.type === 'essay') {
-      await Quiz.addEssayQuestion({ quiz_id, question, points });
+      await Quiz.addEssayQuestion({ quiz_id, question, points, explanation });
     }
   }
 

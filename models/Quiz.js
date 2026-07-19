@@ -167,10 +167,10 @@ const Quiz = {
   },
 
   // ---- Them cau hoi theo tung dang ----
-  async addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex, position }) {
+  async addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex, position, explanation }) {
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position) VALUES ($1,$2,'single_choice',$3,$4) RETURNING *`,
-      [quiz_id, question, points || 0.25, position || 0]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'single_choice',$3,$4,$5) RETURNING *`,
+      [quiz_id, question, points || 0.25, position || 0, explanation || null]
     );
     for (let i = 0; i < options.length; i++) {
       if (!options[i] || !options[i].trim()) continue;
@@ -181,11 +181,11 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addTrueFalseQuestion({ quiz_id, question, points, items, position }) {
+  async addTrueFalseQuestion({ quiz_id, question, points, items, position, explanation }) {
     // items: [{ content, is_correct }, ...] toi da 4 y (a,b,c,d)
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position) VALUES ($1,$2,'true_false',$3,$4) RETURNING *`,
-      [quiz_id, question, points || 1, position || 0]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'true_false',$3,$4,$5) RETURNING *`,
+      [quiz_id, question, points || 1, position || 0, explanation || null]
     );
     for (const item of items) {
       if (!item.content || !item.content.trim()) continue;
@@ -196,17 +196,17 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addShortAnswerQuestion({ quiz_id, question, points, correct_answer, position }) {
+  async addShortAnswerQuestion({ quiz_id, question, points, correct_answer, position, explanation }) {
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position) VALUES ($1,$2,'short_answer',$3,$4,$5) RETURNING *`,
-      [quiz_id, question, points || 0.25, correct_answer, position || 0]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position, explanation) VALUES ($1,$2,'short_answer',$3,$4,$5,$6) RETURNING *`,
+      [quiz_id, question, points || 0.25, correct_answer, position || 0, explanation || null]
     );
     return r.rows[0];
   },
-  async addEssayQuestion({ quiz_id, question, points, position }) {
+  async addEssayQuestion({ quiz_id, question, points, position, explanation }) {
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position) VALUES ($1,$2,'essay',$3,$4) RETURNING *`,
-      [quiz_id, question, points || 2, position || 0]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'essay',$3,$4,$5) RETURNING *`,
+      [quiz_id, question, points || 2, position || 0, explanation || null]
     );
     return r.rows[0];
   },
@@ -229,7 +229,7 @@ const Quiz = {
     for (const q of questions) {
       const val = answers[q.id];
       let earned = 0;
-      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points) };
+      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points), explanation: q.explanation || null };
 
       if (q.type === 'single_choice') {
         const correctOption = q.options.find(o => o.is_correct);

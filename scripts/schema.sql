@@ -426,6 +426,9 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES cate
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_standalone INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
 
+-- ---------- BO SUNG: loi giai chi tiet cho tung cau (kieu "de + dap an + loi giai" giong Azota) ----------
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS explanation TEXT;
+
 -- ---------- BO SUNG: trai nghiem thi kieu Azota/EduQuiz (dem gio, tron de, xep hang, giao de rieng) ----------
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS shuffle_questions INTEGER NOT NULL DEFAULT 0;
