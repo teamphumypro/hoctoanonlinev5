@@ -30,5 +30,9 @@
     "tesseract.js": "^5.1.1",
     "jszip": "^3.10.1",
     "fast-xml-parser": "^4.4.1"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
   }
 }

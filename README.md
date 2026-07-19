@@ -44,7 +44,7 @@ Bản nâng cấp từ website khóa học đơn giản lên LMS đầy đủ:
 
 ### Bước 2 — Cài đặt
 ```
-npm install
+npm ci
 cp .env.example .env
 ```
 Mở file `.env`, dán `DATABASE_URL` vừa copy từ Neon vào, và đặt `SESSION_SECRET` bất kỳ.
@@ -73,7 +73,7 @@ Tạo repository mới, upload toàn bộ thư mục này lên (**trừ `node_mo
 ### Bước 2 — Tạo Web Service trên Render
 1. Vào https://render.com, đăng ký bằng GitHub
 2. **New +** → **Web Service** → chọn repository vừa tạo
-3. Build Command: `npm install` — Start Command: `npm start`
+3. Build Command: `npm ci --omit=dev` — Start Command: `npm run migrate && npm start`
 4. Vào mục **Environment Variables**, thêm toàn bộ các biến giống trong file `.env` của bạn (đặc biệt là `DATABASE_URL` và `SESSION_SECRET`)
 5. **Không cần** thêm Disk (vì database đã ở Neon, không nằm trên Render)
 6. Bấm **Create Web Service**
