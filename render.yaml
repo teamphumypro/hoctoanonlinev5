@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: hoctoanonlinev5
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /
-    envVars:
-      - key: NODE_VERSION
-        value: 20.18.0

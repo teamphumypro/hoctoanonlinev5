@@ -110,34 +110,6 @@ async function extractDocxRich(filePath) {
     text += `[[IMG:${idx}]]`;
   }
 
-  // Cong thuc MathType kieu cu (Equation.DSMT4/MathType 6+) khong nam trong w:drawing (DrawingML)
-  // ma nam trong w:object > v:shape > v:imagedata r:id="..." (VML) kem theo o:OLEObject rieng.
-  // Neu chi tim r:embed (DrawingML) se khong thay gi va cong thuc bi mat trang tuyet doi, khong con
-  // ca placeholder canh bao. Ham nay tim rieng thuoc tinh r:id cua the v:imagedata (anh xem truoc
-  // cua OLE, thuong la .wmf/.emf) de tai dung anh cong thuc, khong nham voi r:id cua o:OLEObject
-  // (tro toi du lieu OLE nhi phan that su, khong hien thi truc tiep duoc).
-  function findVmlImageDataId(node) {
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        const found = findVmlImageDataId(item);
-        if (found) return found;
-      }
-      return null;
-    }
-    if (node && typeof node === 'object') {
-      for (const key of Object.keys(node)) {
-        if (key === ':@') continue;
-        if (key === 'v:imagedata') {
-          const attrs = node[':@'];
-          if (attrs && attrs['@_r:id']) return attrs['@_r:id'];
-        }
-        const found = findVmlImageDataId(node[key]);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
   // Duyet toan bo cay theo dung thu tu tai lieu: gap w:t -> ghi chu, gap m:oMath -> chen cong thuc,
   // gap w:drawing -> chen anh, cac the khac duyet sau vao ben trong theo dung thu tu
   async function walk(nodeArr) {
@@ -153,16 +125,9 @@ async function extractDocxRich(filePath) {
       } else if (tag === 'm:oMath' || tag === 'm:oMathPara') {
         const mathml = ommlNodeToMathml(content);
         if (mathml) text += `[[MATH:${encodeURIComponent(mathml)}]]`;
-      } else if (tag === 'w:drawing') {
+      } else if (tag === 'w:drawing' || tag === 'w:pict') {
         const embedId = findEmbedId(content);
         if (embedId) await addImageFromEmbedId(embedId);
-      } else if (tag === 'w:pict' || tag === 'w:object') {
-        // w:object: cong thuc MathType/Equation OLE cu. w:pict: anh VML cu.
-        // Uu tien r:id cua v:imagedata (anh xem truoc WMF/EMF hien thi duoc); chi khi khong co
-        // moi thu r:embed (truong hop hiem gap DrawingML long trong w:pict).
-        const embedId = findVmlImageDataId(content) || findEmbedId(content);
-        if (embedId) await addImageFromEmbedId(embedId);
-        else text += ' [công thức - chưa hiển thị được, vui lòng sửa tay] ';
       } else if (tag === 'w:p') {
         await walk(content);
         text += '\n\n';
@@ -200,14 +165,13 @@ async function extractDocxRich(filePath) {
   return { text, images };
 }
 
-// Chuyen doi hang loat cac anh cong thuc dang WMF/EMF sang PNG trong 1 lan goi LibreOffice duy nhat
-// (nhanh hon nhieu so voi mo LibreOffice rieng cho tung anh). Neu server khong co LibreOffice
-// (lenh "soffice" khong ton tai), tra ve map rong va KHONG bao loi - de ham goi tu dong dung
-// phuong an du phong (hien chu bao thay vi anh).
+// Chuyen doi hang loat cac anh cong thuc dang WMF/EMF sang PNG.
+// UU TIEN dung thu vien JS thuan (emf-converter + @napi-rs/canvas) — khong can cai LibreOffice/Docker
+// tren server, cai dat nhanh vi da co san file bien dich (khong bien dich luc npm install).
+// Neu vi ly do gi buoc nay loi (file WMF qua la/hiem gap), tu dong thu qua LibreOffice (soffice)
+// NEU server co cai (vd dang chay Docker) — neu khong co ca 2, tra ve rong, khong lam vo ca file.
 async function convertAllWmfImages(zip, relMap) {
   const path = require('path');
-  const os = require('os');
-  const { execFile } = require('child_process');
 
   const wmfTargets = Object.values(relMap)
     .filter(t => /\.(wmf|emf)$/i.test(t))
@@ -215,11 +179,53 @@ async function convertAllWmfImages(zip, relMap) {
   const uniqueTargets = [...new Set(wmfTargets)];
   if (uniqueTargets.length === 0) return {};
 
+  const result = {};
+  const stillNeeded = [];
+
+  // ---- Cach 1 (uu tien): JS thuan, khong can phan mem ngoai ----
+  try {
+    const { convertWmfToDataUrl, convertEmfToDataUrl } = require('emf-converter');
+    const canvasModule = require('@napi-rs/canvas');
+    // emf-converter can co OffscreenCanvas/HTMLCanvasElement ton tai san trong moi truong chay —
+    // gia lap bang @napi-rs/canvas (khong co san trong Node binh thuong)
+    if (typeof globalThis.OffscreenCanvas === 'undefined') {
+      globalThis.OffscreenCanvas = canvasModule.Canvas;
+    }
+
+    for (const target of uniqueTargets) {
+      const f = zip.file(target);
+      if (!f) continue;
+      try {
+        const buf = await f.async('arraybuffer');
+        const isEmf = /\.emf$/i.test(target);
+        const dataUrl = isEmf ? await convertEmfToDataUrl(buf) : await convertWmfToDataUrl(buf);
+        if (dataUrl) {
+          const base64 = dataUrl.split(',')[1];
+          result[target] = base64;
+        } else {
+          stillNeeded.push(target);
+        }
+      } catch (innerErr) {
+        console.error(`Khong chuyen doi duoc ${target} bang JS thuan:`, innerErr.message);
+        stillNeeded.push(target);
+      }
+    }
+  } catch (err) {
+    console.error('Khong tai duoc thu vien chuyen doi WMF thuan JS (emf-converter/@napi-rs/canvas):', err.message);
+    stillNeeded.push(...uniqueTargets);
+  }
+
+  if (stillNeeded.length === 0) return result;
+
+  // ---- Cach 2 (du phong): LibreOffice, chi chay neu server co cai (vd dang dung Docker) ----
+  const os = require('os');
+  const fs = require('fs');
+  const { execFile } = require('child_process');
   let tmpDir;
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmfconv-'));
     const writtenPaths = [];
-    for (const target of uniqueTargets) {
+    for (const target of stillNeeded) {
       const f = zip.file(target);
       if (!f) continue;
       const buf = await f.async('nodebuffer');
@@ -228,42 +234,23 @@ async function convertAllWmfImages(zip, relMap) {
       fs.writeFileSync(localPath, buf);
       writtenPaths.push({ target, localPath, localName });
     }
-    if (writtenPaths.length === 0) return {};
-
-    // LibreOffice headless "--convert-to" khi nhan mot lan qua nhieu file (vd > 100 cong thuc)
-    // hay bo sot mot so file mot cach im lang (khong bao loi, chi don gian khong sinh PNG output).
-    // De khong lam mat cong thuc mot cach vo tinh, chia nho thanh tung lo (batch) va lam lai
-    // (retry) rieng cho nhung file van con thieu sau moi lan, toi da 3 vong.
-    const runBatch = (paths) => new Promise((resolve) => {
-      if (paths.length === 0) return resolve();
-      execFile('soffice', ['--headless', '--convert-to', 'png', '--outdir', tmpDir, ...paths],
-        { timeout: 180000 }, () => resolve()); // du co loi cung resolve, khong reject
-    });
-
-    const pngPathFor = (w) => path.join(tmpDir, w.localName.replace(/\.(wmf|emf)$/i, '.png'));
-    const BATCH_SIZE = 40;
-    for (let round = 0; round < 3; round++) {
-      const missing = writtenPaths.filter(w => !fs.existsSync(pngPathFor(w)));
-      if (missing.length === 0) break;
-      for (let i = 0; i < missing.length; i += BATCH_SIZE) {
-        await runBatch(missing.slice(i, i + BATCH_SIZE).map(w => w.localPath));
+    if (writtenPaths.length > 0) {
+      await new Promise((resolve) => {
+        execFile('soffice', ['--headless', '--convert-to', 'png', '--outdir', tmpDir, ...writtenPaths.map(w => w.localPath)],
+          { timeout: 180000 }, (err) => resolve(err));
+      });
+      for (const w of writtenPaths) {
+        const pngPath = path.join(tmpDir, w.localName.replace(/\.(wmf|emf)$/i, '.png'));
+        if (fs.existsSync(pngPath)) result[w.target] = fs.readFileSync(pngPath).toString('base64');
       }
     }
-
-    const result = {};
-    for (const w of writtenPaths) {
-      const pngPath = pngPathFor(w);
-      if (fs.existsSync(pngPath)) {
-        result[w.target] = fs.readFileSync(pngPath).toString('base64');
-      }
-    }
-    return result;
   } catch (err) {
-    console.error('Khong chuyen doi duoc cong thuc WMF (co the server chua cai LibreOffice):', err.message);
-    return {};
+    console.error('Khong co LibreOffice de du phong (binh thuong neu server khong dung Docker):', err.message);
   } finally {
     if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {} }
   }
+
+  return result;
 }
 
 module.exports = { extractDocxRich };

@@ -5,11 +5,11 @@ const axios = require('axios');
 
 const SYSTEM_PROMPT = `Bạn là công cụ số hóa đề thi. Nhiệm vụ: đọc văn bản đề thi (có thể lộn xộn do trích xuất từ Word/PDF) và trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích, không dùng markdown code fence.
 
-Mỗi phần tử trong mảng là 1 câu hỏi. Không được giả định số phần, số câu, số phương án hay số ý. Dùng một trong 4 dạng:
-1. Trắc nghiệm: {"type":"single_choice","part":1,"sectionTitle":"...","questionNumber":1,"question":"...","points":0.25,"options":["..."],"correctIndex":0,"explanation":"..."}
-2. Đúng/Sai với số ý bất kỳ: {"type":"true_false","part":2,"sectionTitle":"...","questionNumber":1,"question":"...","points":1,"items":[{"content":"...","is_correct":true}],"explanation":"..."}
-3. Trả lời ngắn: {"type":"short_answer","part":3,"sectionTitle":"...","questionNumber":1,"question":"...","points":0.5,"correct_answer":"...","explanation":"..."}
-4. Tự luận: {"type":"essay","part":4,"sectionTitle":"...","questionNumber":1,"question":"...","points":2,"explanation":"..."}
+Mỗi phần tử trong mảng là 1 câu hỏi theo đúng 1 trong 4 dạng sau:
+1. Trắc nghiệm 1 đáp án đúng: {"type":"single_choice","question":"...","points":0.25,"options":["...","...","...","..."],"correctIndex":0}
+2. Đúng/Sai nhiều ý (thường có 4 ý a,b,c,d): {"type":"true_false","question":"...","points":1,"items":[{"content":"...","is_correct":true},{"content":"...","is_correct":false}]}
+3. Trả lời ngắn (đề yêu cầu tự tính/tự điền đáp án cụ thể): {"type":"short_answer","question":"...","points":0.5,"correct_answer":"..."}
+4. Tự luận (không có đáp án cụ thể, cần chấm tay - vd Ngữ văn): {"type":"essay","question":"...","points":2}
 
 Quy tắc quan trọng:
 - Nếu văn bản có công thức Toán/Lý/Hóa bị lỗi ký tự do không đọc được từ file gốc, hãy cố suy luận lại nội dung hợp lý nhất có thể dựa trên ngữ cảnh, và nếu không chắc chắn, giữ nguyên phần chữ đọc được, không tự bịa số liệu.
@@ -17,9 +17,7 @@ Quy tắc quan trọng:
 - Một số đề ghi đáp án NGAY SAU mỗi câu hỏi theo dạng "Đáp án: ..." hoặc "Đáp số: ..." (khác với đề có 1 bảng đáp án gộp chung ở cuối bài). Với dạng này: PHẢI đọc đúng giá trị đáp án đó và gán vào correctIndex (nếu là 1 chữ cái A/B/C/D) hoặc correct_answer (nếu là số/chữ tự do, dùng dạng "short_answer"). TUYỆT ĐỐI KHÔNG đưa dòng "Đáp án: ..." đó vào trong nội dung câu hỏi (question) — phải loại bỏ nó ra khỏi phần đề bài mà học viên nhìn thấy.
 - Nếu sau đáp án có phần "HƯỚNG DẪN GIẢI" / "LỜI GIẢI" (lời giải chi tiết từng bước), TUYỆT ĐỐI KHÔNG đưa phần lời giải đó vào nội dung câu hỏi — chỉ giữ lại đúng phần đề bài, bỏ hết lời giải.
 - Nếu tìm thấy đáp án đúng trong đề (ghi rõ hoặc có bảng đáp án), hãy gán correctIndex/is_correct/correct_answer tương ứng. Nếu KHÔNG chắc chắn đáp án đúng, vẫn tạo câu hỏi bình thường nhưng chọn correctIndex là -1 (nghĩa là chưa xác định, để người dùng tự chọn lại).
-- Nhận diện linh hoạt: tài liệu có thể không có phần, có nhiều hơn 3 phần, số câu và số lựa chọn bất kỳ, bảng đáp án/lời giải có thể ở bất kỳ vị trí nào.
-- Giữ nguyên số thứ tự, tên phần và nội dung câu hỏi càng sát bản gốc càng tốt.
-- Khi có lời giải chi tiết, gán vào trường explanation của đúng câu; không trộn lời giải vào question.
+- Giữ nguyên số thứ tự và nội dung câu hỏi càng sát bản gốc càng tốt.
 - Chỉ trả về mảng JSON, không thêm bất kỳ chữ nào khác.`;
 
 async function parseWithAI(examText, config, images = []) {
@@ -29,11 +27,11 @@ async function parseWithAI(examText, config, images = []) {
   const model = (config.ai_model || 'claude-sonnet-5').trim();
 
   // Cat bot neu van ban qua dai (tranh vuot gioi han token / chi phi qua cao ngoai y muon)
-  const trimmedText = examText.length > 90000 ? examText.slice(0, 90000) : examText;
+  const trimmedText = examText.length > 40000 ? examText.slice(0, 40000) : examText;
 
   const response = await axios.post('https://api.anthropic.com/v1/messages', {
     model,
-    max_tokens: 16000,
+    max_tokens: 8000,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: `Đây là văn bản đề thi cần số hóa:\n\n${trimmedText}` }]
   }, {
@@ -59,7 +57,6 @@ async function parseWithAI(examText, config, images = []) {
   return parsed.map(q => {
     const restored = { ...q, needsReview: q.correctIndex === -1 || q.needsReview === true };
     if (restored.question) restored.question = restoreImages(restored.question, images);
-    if (restored.explanation) restored.explanation = restoreImages(restored.explanation, images);
     if (Array.isArray(restored.options)) restored.options = restored.options.map(o => restoreImages(o, images));
     if (Array.isArray(restored.items)) restored.items = restored.items.map(it => ({ ...it, content: restoreImages(it.content, images) }));
     return restored;

@@ -130,28 +130,4 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`>>> LMS dang chay tai http://localhost:${PORT}`);
-
-  // Canh bao ngay tu dau neu server thieu LibreOffice/Poppler: day la nguyen nhan pho bien
-  // nhat khien cong thuc toan trong de thi hien chu "[cong thuc - chua hien thi duoc...]"
-  // thay vi anh that. Thuong xay ra khi Render (hoac may chu khac) duoc tao bang moi truong
-  // Node thuong thay vi Docker (dockerfilePath: ./Dockerfile trong render.yaml).
-  try {
-    const { checkSystemDependencies } = require('./services/examImport/systemCheck');
-    const deps = checkSystemDependencies();
-    if (!deps.soffice || !deps.pdftoppm) {
-      console.warn('====================================================================');
-      console.warn('>>> CANH BAO: thieu phan mem he thong can cho module "Nhap de thi":');
-      if (!deps.soffice) console.warn('    - LibreOffice (soffice) CHUA CO -> cong thuc MathType/WMF trong de Word se KHONG hien duoc thanh anh.');
-      if (!deps.pdftoppm) console.warn('    - Poppler (pdftoppm) CHUA CO -> khong doc duoc PDF dang scan (anh).');
-      console.warn('>>> Nguyen nhan thuong gap: service dang chay bang moi truong Node thuong tren Render,');
-      console.warn('    thay vi Docker. Kiem tra: Render Dashboard -> service -> Settings -> Environment phai la "Docker"');
-      console.warn('    va Dockerfile Path la "./Dockerfile" (dung nhu khai bao trong render.yaml).');
-      console.warn('    Neu service duoc tao thu cong (khong qua Blueprint tu render.yaml) thi thuong bi mac dinh sang Node.');
-      console.warn('====================================================================');
-    } else {
-      console.log('>>> Da phat hien LibreOffice + Poppler tren server: cong thuc toan va PDF scan se hien thi day du.');
-    }
-  } catch (e) {
-    console.warn('>>> Khong kiem tra duoc phan mem he thong (khong anh huong hoat dong chinh):', e.message);
-  }
 });

@@ -36,43 +36,12 @@ async function extractFromDocx(filePath) {
   return { text, images };
 }
 
-async function ocrImage(filePath) {
-  const Tesseract = require('tesseract.js');
-  const { data } = await Tesseract.recognize(filePath, 'vie+eng', {
-    logger: m => { if (m.status === 'recognizing text' && m.progress > 0.99) console.log('OCR xong:', path.basename(filePath)); }
-  });
-  return data.text || '';
-}
-
 async function extractFromPdf(filePath) {
   const pdfParse = require('pdf-parse');
   const buffer = fs.readFileSync(filePath);
   const data = await pdfParse(buffer);
-  const text = (data.text || '').trim();
-
-  // PDF có text thật: dùng trực tiếp, nhanh và chính xác hơn OCR.
-  if (text.length >= 80) return { text, images: [], extractionMode: 'pdf_text' };
-
-  // PDF scan: chuyển từng trang sang PNG bằng poppler rồi OCR. Dockerfile đi kèm đã cài poppler-utils.
-  const os = require('os');
-  const { execFile } = require('child_process');
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'exam-pdf-'));
-  const prefix = path.join(tmpDir, 'page');
-  try {
-    await new Promise((resolve, reject) => {
-      execFile('pdftoppm', ['-png', '-r', '180', filePath, prefix], { timeout: 240000 }, (err) => {
-        if (err) reject(new Error('PDF này là bản scan nhưng máy chủ chưa chuyển được trang PDF sang ảnh: ' + err.message));
-        else resolve();
-      });
-    });
-    const pages = fs.readdirSync(tmpDir).filter(f => /^page-\d+\.png$/i.test(f)).sort((a,b) => a.localeCompare(b, undefined, { numeric:true }));
-    if (!pages.length) throw new Error('Không tách được trang nào từ PDF scan.');
-    const chunks = [];
-    for (const page of pages) chunks.push(await ocrImage(path.join(tmpDir, page)));
-    return { text: chunks.join('\n\n'), images: [], extractionMode: 'pdf_ocr' };
-  } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
-  }
+  // Luu y: chi doc duoc PDF co chu thuc (van ban), KHONG doc duoc PDF dang anh scan
+  return data.text;
 }
 
 // Doc file Excel: gom het noi dung cac o theo tung dong, moi dong 1 dong van ban,
@@ -92,17 +61,27 @@ async function extractFromExcel(filePath) {
   return lines.join('\n');
 }
 
-// Doc chu trong anh bang OCR (Tesseract, mien phi, chay ngay tren server, ho tro tieng Viet).
+// Doc chu trong anh bang OCR (Tesseract, mien phi, ho tro tieng Viet).
 // Luu y: do chinh xac THAP HON nhieu so voi doc file docx/pdf that su, dac biet voi cong thuc Toan/Ly/Hoa
 // va anh chup nghieng/mo/thieu sang - chi nen dung khi khong co san file goc.
+// (Tam thoi go bo goi tesseract.js khoi package.json vi qua nang, gay loi "npm install" tren goi Render
+// Free - neu ban muon bat lai tinh nang doc anh, them lai "tesseract.js" vao package.json va can nang cap
+// goi Render du tai nguyen build.)
 async function extractFromImage(filePath) {
-  return ocrImage(filePath);
+  let Tesseract;
+  try {
+    Tesseract = require('tesseract.js');
+  } catch (e) {
+    throw new Error('Tính năng đọc ảnh (OCR) hiện chưa được bật trên server này. Vui lòng dùng file .docx/.pdf/.xlsx thay thế.');
+  }
+  const { data } = await Tesseract.recognize(filePath, 'vie+eng');
+  return data.text;
 }
 
 async function extractText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.docx') return extractFromDocx(filePath); // { text, images }
-  if (ext === '.pdf') return extractFromPdf(filePath);
+  if (ext === '.pdf') return { text: await extractFromPdf(filePath), images: [] };
   if (ext === '.xlsx' || ext === '.xls') return { text: await extractFromExcel(filePath), images: [] };
   if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) return { text: await extractFromImage(filePath), images: [] };
   throw new Error('Chỉ hỗ trợ file .docx, .pdf, .xlsx hoặc ảnh (.jpg/.png)');

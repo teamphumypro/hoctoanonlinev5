@@ -42,40 +42,25 @@ exports.upload = async (req, res) => {
       });
     }
 
-    // Luôn chạy bộ parser động trước: không phụ thuộc API, không khóa form và giữ được ảnh/công thức.
-    let questions = parseExamText(rawText, images);
+    let questions = [];
     let usedAI = false;
     let aiError = null;
     const wantAI = req.body.use_ai === 'on' && (config.ai_api_key || '').trim();
-    const reviewRatio = questions.length ? questions.filter(q => q.needsReview).length / questions.length : 1;
 
-    // AI chỉ là phương án cứu hộ khi parser nội bộ không đọc được hoặc phần lớn câu cần kiểm tra.
-    // Không để AI ghi đè một kết quả nội bộ đang tốt, tránh mất bảng đáp án/lời giải đã ghép chính xác.
-    if (wantAI && (questions.length === 0 || reviewRatio >= 0.6)) {
+    if (wantAI) {
       try {
-        const aiQuestions = await parseWithAI(rawText, config, images);
-        if (Array.isArray(aiQuestions) && aiQuestions.length > 0) {
-          questions = aiQuestions;
-          usedAI = true;
-        }
+        questions = await parseWithAI(rawText, config, images);
+        usedAI = true;
       } catch (err) {
         console.error('Loi AI parse de thi:', err.message);
         aiError = err.message;
+        questions = parseExamText(rawText, images);
       }
+    } else {
+      questions = parseExamText(rawText, images);
     }
 
-    // Neu bat ky cau hoi nao con chua "[cong thuc - chua hien thi duoc...]" (rieng WMF khong
-    // chuyen doi duoc), hien canh bao ro rang tren man hinh thay vi de admin tu doan qua giao dien.
-    const FORMULA_FALLBACK_MARK = 'chưa hiển thị được, vui lòng sửa tay';
-    const questionsJson = JSON.stringify(questions);
-    const hasMissingFormula = questionsJson.includes(FORMULA_FALLBACK_MARK);
-    const { checkSystemDependencies } = require('../services/examImport/systemCheck');
-    const sysDeps = checkSystemDependencies();
-
-    res.render('admin/quizzes/import-review', {
-      quiz, questions, usedAI, aiError,
-      formulaWarning: hasMissingFormula ? { sofficeMissing: !sysDeps.soffice } : null
-    });
+    res.render('admin/quizzes/import-review', { quiz, questions, usedAI, aiError });
   } catch (err) {
     console.error('Loi doc file de thi:', err);
     if (filePath) fs.unlink(filePath, () => {});

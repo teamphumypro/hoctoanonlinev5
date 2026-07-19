@@ -1,18 +1,14 @@
-# Dockerfile nay CHI can thiet neu ban muon he thong tu hien thi dung cac cong thuc Toan/Ly/Hoa
-# duoc chen bang MathType kieu cu (dinh dang OLE + anh xem truoc WMF) - day la dinh dang pho bien
-# nhat trong de thi tieng Viet hien nay. Neu khong dung Dockerfile nay (van deploy kieu Node binh
-# thuong nhu truoc), moi thu khac VAN CHAY BINH THUONG, chi rieng cong thuc dang WMF se khong hien
-# duoc thanh anh (se hien placeholder chu "[cong thuc]" de ban tu sua tay).
+# Dockerfile nay GIO LA TUY CHON, khong bat buoc nua — he thong da chuyen sang dung thu vien
+# JS thuan (emf-converter + @napi-rs/canvas) de doc cong thuc dang WMF/EMF, khong can LibreOffice
+# nua trong da so truong hop. Dockerfile nay chi con dung lam PHUONG AN DU PHONG cho nhung file WMF
+# hiem gap ma thu vien JS chua xu ly duoc — neu ban van dang deploy kieu Node binh thuong (khong
+# dung Dockerfile nay), moi thu van hoat dong binh thuong.
 FROM node:20-slim
 
 # Cai dat LibreOffice (chi phan can, khong cai full bo Office de do nang) de chuyen doi WMF -> PNG
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-draw \
-    poppler-utils \
-    tesseract-ocr \
-    tesseract-ocr-vie \
-    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

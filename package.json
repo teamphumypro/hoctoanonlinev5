@@ -27,12 +27,9 @@
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.8.0",
     "xlsx": "^0.18.5",
-    "tesseract.js": "^5.1.1",
     "jszip": "^3.10.1",
-    "fast-xml-parser": "^4.4.1"
-  },
-  "engines": {
-    "node": "20.x",
-    "npm": "10.x"
+    "fast-xml-parser": "^4.4.1",
+    "emf-converter": "^1.1.7",
+    "@napi-rs/canvas": "^0.1.53"
   }
 }
