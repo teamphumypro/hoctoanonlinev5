@@ -8,7 +8,7 @@
   <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
 
   <div class="alert alert-warning small">
-    <strong>Lưu ý:</strong> hệ thống đọc được văn bản chữ trong file .docx/.pdf/.xlsx và <strong>ảnh (.jpg/.png, dùng OCR)</strong>, nhưng <strong>không đọc được công thức Toán/Lý/Hóa được chèn bằng công cụ Equation hoặc MathType của Word</strong> (cả 2 đều lưu dưới dạng hình ảnh/đối tượng nhúng, không phải chữ), và <strong>không đọc được PDF dạng ảnh scan</strong> (chỉ đọc được PDF có chữ thật — nếu là PDF scan, chụp lại từng trang thành ảnh .jpg rồi tải lên thay thế). <strong>Đọc ảnh (OCR) có độ chính xác thấp hơn nhiều</strong> so với file gốc — chỉ nên dùng khi không có file docx/pdf gốc, và luôn phải xem lại kỹ trước khi lưu. Nếu dùng link Google Drive, file cần dưới 25MB và đã bật chia sẻ "Bất kỳ ai có đường liên kết". Sau khi tải lên, bạn sẽ được xem trước và sửa lại toàn bộ trước khi lưu.
+    <strong>Khuyến nghị để giống quy trình Azota:</strong> ưu tiên file <strong>.docx gốc</strong>. Hệ thống giữ ảnh nhúng và công thức Word Equation; công thức MathType cũ dạng WMF/EMF sẽ được chuyển sang ảnh khi máy chủ có LibreOffice. PDF chỉ đọc tốt khi có lớp chữ thật; PDF scan và ảnh dùng OCR nên cần rà soát kỹ. Sau khi tải lên, màn hình sẽ chia đôi: <strong>bên trái là đề thực tế, bên phải là mã nhập liệu</strong>; bạn có thể sửa, chọn đáp án, chia điểm và kiểm tra lỗi trước khi lưu.
   </div>
 
   <form method="POST" action="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" enctype="multipart/form-data">

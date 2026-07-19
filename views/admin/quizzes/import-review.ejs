@@ -1,179 +1,428 @@
-<% var pageTitle = 'Xem trước & sửa đề đã tải lên' %>
+<% var pageTitle = 'Nhập đề thực chiến kiểu Azota' %>
 <%- include('../../partials/admin-header') %>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h6 class="fw-bold mb-0">Xem trước & sửa trước khi lưu</h6>
-    <div class="small text-muted">
-      Nhận diện được <strong><%= questions.length %></strong> câu hỏi
-      <%= usedAI ? '(dùng AI)' : '(dò theo mẫu thông thường)' %>.
-      Bên trái là <strong>hình ảnh thật sự học viên sẽ thấy</strong>, bên phải để bạn sửa — sửa xong preview bên trái tự cập nhật ngay.
-    </div>
+<%
+function htmlToEditor(v) {
+  var mathTokens = [];
+  var imageTokens = [];
+  var value = String(v || '')
+    .replace(/<math[\s\S]*?<\/math>/gi, function(m){ var i = mathTokens.push(m) - 1; return '___MATH_' + i + '___'; })
+    .replace(/<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi, function(m, src){ var i = imageTokens.push('<img src="' + src + '">') - 1; return '___IMAGE_' + i + '___'; })
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+  value = value.replace(/___MATH_(\d+)___/g, function(m, i){ return mathTokens[Number(i)] || ''; });
+  value = value.replace(/___IMAGE_(\d+)___/g, function(m, i){ return imageTokens[Number(i)] || ''; });
+  return value.trim();
+}
+function buildEditorText(list) {
+  var groups = { single_choice: [], true_false: [], short_answer: [], essay: [] };
+  (list || []).forEach(function(q){ (groups[q.type] || groups.single_choice).push(q); });
+  var out = [];
+  function addTitle(code, title) { out.push('[PHẦN ' + code + ': ' + title + ']'); }
+  function addCommon(q, number) {
+    out.push('Câu ' + number + '. ' + htmlToEditor(q.question || ''));
+  }
+  if (groups.single_choice.length) {
+    addTitle('I', 'Thí sinh trả lời từ câu 1 đến hết phần. Mỗi câu chỉ chọn một phương án.');
+    groups.single_choice.forEach(function(q, i){
+      addCommon(q, i + 1);
+      ['A','B','C','D'].forEach(function(letter, k){ out.push(letter + '. ' + htmlToEditor((q.options && q.options[k]) || '')); });
+      if (Number.isInteger(q.correctIndex) && q.correctIndex >= 0) out.push('Đáp án: ' + ['A','B','C','D'][q.correctIndex]);
+      if (q.explanation) out.push('Lời giải: ' + htmlToEditor(q.explanation));
+      out.push('');
+    });
+  }
+  if (groups.true_false.length) {
+    addTitle('II', 'Trong mỗi ý a), b), c), d), thí sinh chọn Đúng hoặc Sai.');
+    groups.true_false.forEach(function(q, i){
+      addCommon(q, i + 1);
+      ['a','b','c','d'].forEach(function(letter, k){
+        var item = q.items && q.items[k] ? q.items[k] : { content:'', is_correct:false };
+        out.push(letter + ') ' + htmlToEditor(item.content || '') + ' [' + (item.is_correct ? 'Đúng' : 'Sai') + ']');
+      });
+      if (q.explanation) out.push('Lời giải: ' + htmlToEditor(q.explanation));
+      out.push('');
+    });
+  }
+  if (groups.short_answer.length) {
+    addTitle('III', 'Thí sinh trả lời ngắn.');
+    groups.short_answer.forEach(function(q, i){
+      addCommon(q, i + 1);
+      out.push('Đáp án: ' + htmlToEditor(q.correct_answer || ''));
+      if (q.explanation) out.push('Lời giải: ' + htmlToEditor(q.explanation));
+      out.push('');
+    });
+  }
+  if (groups.essay.length) {
+    addTitle('IV', 'Tự luận.');
+    groups.essay.forEach(function(q, i){
+      addCommon(q, i + 1);
+      if (q.explanation) out.push('Lời giải: ' + htmlToEditor(q.explanation));
+      out.push('');
+    });
+  }
+  return out.join('\n').trim();
+}
+var initialEditorText = buildEditorText(questions);
+%>
+
+<style>
+  body{overflow:hidden}
+  .az-shell{height:calc(100vh - 72px);min-height:650px;margin:-16px -12px -20px;background:#f3f5f9;display:flex;flex-direction:column;border-top:1px solid #dde3ee}
+  .az-top{height:57px;background:#fff;border-bottom:1px solid #dbe1eb;display:flex;align-items:center;gap:9px;padding:7px 14px;flex:0 0 auto}
+  .az-title{height:38px;min-width:280px;max-width:720px;flex:1;border:1px solid #d4dbe7;border-radius:6px;padding:0 12px;font-size:14px;color:#27364e;background:#fff}
+  .az-top .btn{white-space:nowrap}
+  .az-body{display:grid;grid-template-columns:minmax(500px,1fr) minmax(550px,1.08fr);min-height:0;flex:1}
+  .az-preview{overflow:auto;padding:12px 15px 90px;border-right:1px solid #d4dbe7;background:#f5f7fb}
+  .az-editor-side{min-width:0;background:#fff;display:flex;flex-direction:column}
+  .az-tools{height:45px;border-bottom:1px solid #e1e6ee;display:flex;align-items:center;gap:7px;padding:5px 9px;background:#fff;flex:0 0 auto}
+  .az-editor-box{min-height:0;flex:1;display:grid;grid-template-columns:48px 1fr;overflow:hidden}
+  .az-lines{padding:10px 8px 80px 0;text-align:right;color:#77849a;background:#f7f8fa;border-right:1px solid #e7eaf0;font:13px/1.58 Consolas,Monaco,monospace;overflow:hidden;user-select:none;white-space:pre}
+  .az-editor{width:100%;height:100%;resize:none;border:0;outline:0;padding:10px 15px 80px;font:13px/1.58 Consolas,Monaco,monospace;color:#d21f2b;white-space:pre;overflow:auto;background:#fff;tab-size:2}
+  .az-group{background:#fff;border:1px solid #cbd4e1;border-radius:6px;margin-bottom:13px;overflow:hidden;box-shadow:0 1px 2px rgba(35,55,90,.05)}
+  .az-group-head{padding:10px 13px;border-bottom:1px solid #dfe5ee;background:#fff}
+  .az-group-label{display:inline-block;border:1px solid #c7ced9;border-radius:4px;padding:5px 9px;font-size:13px;color:#24344f;background:#fff;margin-bottom:8px}
+  .az-group-title{font-size:14px;font-weight:700;color:#15243d;line-height:1.45}
+  .az-question{padding:11px 13px 13px;border-bottom:1px solid #e3e7ee;background:#fff;scroll-margin-top:8px}
+  .az-question:last-child{border-bottom:0}
+  .az-qbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .az-qbadge{border:1px solid #bfd0ed;border-radius:4px;color:#2055a8;background:#f8fbff;padding:4px 8px;font-weight:700;font-size:13px}
+  .az-qactions{font-size:12px;color:#5270a0;display:flex;align-items:center;gap:10px}
+  .az-qpoints{margin-left:auto;font-size:12px;color:#6b7688}
+  .az-qtext{font-size:14px;line-height:1.55;color:#111827;margin-bottom:7px;overflow-wrap:anywhere}
+  .az-qtext img,.az-answer img,.az-solution img{max-width:100%;height:auto;display:block;margin:6px 0}
+  .az-answer{display:flex;align-items:flex-start;gap:8px;margin:5px 0;padding:3px 4px;border-radius:5px;cursor:pointer}
+  .az-answer:hover{background:#f6f8fc}
+  .az-letter{width:27px;height:27px;flex:0 0 27px;display:flex;align-items:center;justify-content:center;border:1px solid #cad2de;border-radius:4px;background:#fff;font-weight:700;color:#2c3b54}
+  .az-answer.correct .az-letter{border-color:#2d66cf;color:#1c55bd;background:#eef4ff}
+  .az-answer.correct:before{content:'✓';color:#1b62d2;font-weight:900;margin:4px -4px 0 0}
+  .az-answer-text{padding-top:3px;line-height:1.45;min-width:0}
+  .az-solution{margin-top:10px;padding-top:9px;border-top:1px solid #e5e8ee;color:#546074;font-size:12px;line-height:1.5}
+  .az-solution-title{font-size:11px;color:#df8a00;font-weight:700;text-transform:uppercase;margin-bottom:4px}
+  .az-empty{background:#fff;border:1px dashed #c8d0dc;border-radius:7px;padding:35px;text-align:center;color:#748094}
+  .az-status{font-size:12px;color:#68758a;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .az-error{color:#b42318;background:#fff0ef;border:1px solid #ffc9c5;border-radius:5px;padding:4px 7px}
+  .az-floating{position:fixed;right:18px;bottom:16px;z-index:30;display:flex;gap:7px;padding:7px;background:#fff;border:1px solid #d8dee8;border-radius:8px;box-shadow:0 8px 24px rgba(31,46,78,.16)}
+  .az-nav-pop{position:fixed;top:124px;right:24px;z-index:40;width:310px;max-height:65vh;overflow:auto;background:#fff;border:1px solid #d6dde8;border-radius:8px;padding:12px;box-shadow:0 10px 30px rgba(28,43,71,.2);display:none}
+  .az-nav-pop.show{display:block}
+  .az-nav-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+  .az-nav-grid button{border:1px solid #ccd5e2;background:#fff;border-radius:4px;height:32px;font-size:12px}
+  .az-nav-grid button.has-error{border-color:#dc3545;color:#b42318;background:#fff5f5}
+  .az-nav-grid button.ok{border-color:#9db7e4;background:#f2f6ff;color:#1d56ad}
+  .az-modal-mask{position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+  .az-modal-mask.show{display:flex}
+  .az-modal-card{width:min(720px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:9px;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+  .az-modal-head{padding:14px 18px;border-bottom:1px solid #e1e5ec;display:flex;justify-content:space-between;align-items:center}
+  .az-modal-body{padding:16px 18px}
+  .az-point-row{display:grid;grid-template-columns:1fr 110px 120px;gap:10px;align-items:center;margin-bottom:9px}
+  .az-modal-foot{padding:12px 18px;border-top:1px solid #e1e5ec;display:flex;justify-content:flex-end;gap:8px}
+  @media(max-width:1150px){.az-body{grid-template-columns:1fr}.az-preview{display:none}.az-shell{height:calc(100vh - 65px)}}
+</style>
+
+<div class="az-shell">
+  <div class="az-top">
+    <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-light btn-sm" title="Quay lại"><i class="fa-solid fa-chevron-left"></i></a>
+    <input class="az-title" value="<%= quiz.title %>" readonly aria-label="Tên đề thi">
+    <button type="button" class="btn btn-primary btn-sm" id="pointBtn"><i class="fa-regular fa-square-check"></i> Chia điểm</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="infoBtn"><i class="fa-solid fa-circle-info"></i> Thông tin đề</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="jumpBtn"><i class="fa-solid fa-arrow-down-1-9"></i> Đi đến câu</button>
+    <span class="az-status ms-auto" id="parseStatus">Đang nhận diện...</span>
+    <button type="submit" form="saveExamForm" class="btn btn-primary px-4">Tiếp tục</button>
   </div>
-  <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
+
+  <% if (aiError) { %><div class="alert alert-warning m-2 py-2 small">AI gặp lỗi: <%= aiError %>. Hệ thống đã tự chuyển sang bộ nhận diện thường để bạn tiếp tục sửa.</div><% } %>
+
+  <div class="az-body">
+    <section class="az-preview" id="previewPane"></section>
+
+    <section class="az-editor-side">
+      <div class="az-tools">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="uploadAgain"><i class="fa-solid fa-upload"></i> Upload lại</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="insertSection"><i class="fa-solid fa-plus"></i> Chọn dạng câu</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="insertFormula">∑ Chèn công thức</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="insertImage"><i class="fa-regular fa-image"></i> Chèn ảnh/link</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="formatBtn"><i class="fa-solid fa-wand-magic-sparkles"></i> Chuẩn hóa</button>
+      </div>
+      <div class="az-editor-box">
+        <div class="az-lines" id="lineNumbers">1</div>
+        <textarea id="rawEditor" class="az-editor" spellcheck="false"><%= initialEditorText %></textarea>
+      </div>
+    </section>
+  </div>
 </div>
 
-<% if (aiError) { %>
-  <div class="alert alert-warning small">AI gặp lỗi (<%= aiError %>) nên hệ thống đã tự chuyển sang dò theo mẫu thông thường.</div>
-<% } %>
-<% if (questions.length === 0) { %>
-  <div class="alert alert-danger">Không nhận diện được câu hỏi nào trong file này. Vui lòng kiểm tra lại file hoặc nhập câu hỏi thủ công.</div>
-<% } %>
-
-<form method="POST" action="/admin/bai-kiem-tra/luu-de-import">
+<form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="saveExamForm">
   <input type="hidden" name="redirect_to" value="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>">
   <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
-
-  <% questions.forEach((q, i) => { %>
-    <div class="card p-0 mb-3 question-row overflow-hidden" data-index="<%= i %>">
-      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-white">
-        <span class="fw-bold">Câu <%= i+1 %> <%= q.needsReview ? '<span class="badge bg-warning text-dark ms-1">Cần kiểm tra lại</span>' : '' %></span>
-        <label class="small d-flex align-items-center gap-1 mb-0">
-          <input type="checkbox" name="questions[<%= i %>][include]" checked> Giữ câu này
-        </label>
-      </div>
-
-      <div class="row g-0">
-        <!-- Cot trai: xem truoc that su (tu cap nhat khi sua ben phai) -->
-        <div class="col-md-6 border-end bg-light p-3 preview-pane">
-          <div class="small text-muted mb-2"><i class="fa-solid fa-eye"></i> Xem trước</div>
-          <div class="preview-content bg-white rounded p-3 border" style="min-height:120px"></div>
-          <div class="preview-explanation mt-2 p-2 rounded" style="background:#fff8e6; border:1px solid #ffe6a3; display:none">
-            <div class="small fw-bold text-warning-emphasis mb-1"><i class="fa-solid fa-lightbulb"></i> Lời giải</div>
-            <div class="expl-text small"></div>
-          </div>
-        </div>
-
-        <!-- Cot phai: cac o de sua -->
-        <div class="col-md-6 p-3">
-          <div class="row g-2 mb-2">
-            <div class="col-md-8">
-              <label class="form-label small">Dạng câu hỏi</label>
-              <select name="questions[<%= i %>][type]" class="form-select form-select-sm q-type">
-                <option value="single_choice" <%= q.type==='single_choice'?'selected':'' %>>Phần I — Trắc nghiệm nhiều lựa chọn</option>
-                <option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Phần II — Đúng/Sai (4 ý)</option>
-                <option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Phần III — Trả lời ngắn</option>
-                <option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận (chấm tay)</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small">Điểm</label>
-              <input type="number" step="0.05" name="questions[<%= i %>][points]" class="form-control form-control-sm q-points" value="<%= q.points %>">
-            </div>
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label small">Nội dung câu hỏi <span class="text-muted">(có thể chứa thẻ &lt;img&gt;/&lt;math&gt; — cứ để nguyên, đừng xóa)</span></label>
-            <textarea name="questions[<%= i %>][question]" class="form-control form-control-sm q-question" rows="3"><%= q.question %></textarea>
-          </div>
-
-          <!-- Trac nghiem 1 dap an -->
-          <div class="q-fields" data-type="single_choice" style="<%= q.type!=='single_choice'?'display:none':'' %>">
-            <% for (let k = 0; k < 4; k++) { %>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <input type="radio" name="questions[<%= i %>][correct_index]" value="<%= k %>" class="q-correct-index" <%= (q.correctIndex===k)?'checked':(k===0 && q.correctIndex===undefined?'checked':'') %>>
-                <input name="questions[<%= i %>][options][]" class="form-control form-control-sm q-option" value="<%= (q.options && q.options[k]) ? q.options[k] : '' %>" placeholder="Phương án <%= String.fromCharCode(65+k) %>">
-              </div>
-            <% } %>
-          </div>
-
-          <!-- Dung/Sai -->
-          <div class="q-fields" data-type="true_false" style="<%= q.type!=='true_false'?'display:none':'' %>">
-            <% for (let k = 0; k < 4; k++) { %>
-              <% var item = (q.items && q.items[k]) ? q.items[k] : { content: '', is_correct: false }; %>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="text-muted" style="width:16px"><%= String.fromCharCode(97+k) %>)</span>
-                <input name="questions[<%= i %>][tf_content][]" class="form-control form-control-sm q-tf-content" value="<%= item.content %>">
-                <label class="d-flex align-items-center gap-1 small mb-0">
-                  <input type="checkbox" name="questions[<%= i %>][tf_correct][]" value="<%= k %>" class="q-tf-correct" <%= item.is_correct ? 'checked' : '' %>> Đúng
-                </label>
-              </div>
-            <% } %>
-          </div>
-
-          <!-- Tra loi ngan -->
-          <div class="q-fields" data-type="short_answer" style="<%= q.type!=='short_answer'?'display:none':'' %>">
-            <input name="questions[<%= i %>][correct_answer]" class="form-control form-control-sm q-correct-answer" value="<%= q.correct_answer || '' %>" placeholder="Đáp án đúng">
-          </div>
-
-          <!-- Tu luan: khong can them field -->
-
-          <div class="mt-2">
-            <label class="form-label small">Lời giải chi tiết <span class="text-muted">(tùy chọn — hiện cho học viên xem sau khi nộp bài)</span></label>
-            <textarea name="questions[<%= i %>][explanation]" class="form-control form-control-sm q-explanation" rows="3"><%= q.explanation || '' %></textarea>
-          </div>
-        </div>
-      </div>
-    </div>
-  <% }) %>
-
-  <% if (questions.length > 0) { %>
-    <button class="btn btn-primary">Lưu tất cả câu hỏi đã chọn vào bài kiểm tra</button>
-  <% } %>
+  <div id="hiddenQuestions"></div>
 </form>
 
-<script>window.MathJax = { tex: { inlineMath: [['$','$']] }, startup: { typeset: false } };</script>
-<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
+<div class="az-floating">
+  <button type="button" class="btn btn-outline-secondary btn-sm" id="validateBtn">Kiểm tra lỗi</button>
+  <button type="submit" form="saveExamForm" class="btn btn-primary btn-sm px-4">Lưu <span id="saveCount">0</span> câu</button>
+</div>
+
+<div class="az-nav-pop" id="navPop">
+  <div class="d-flex justify-content-between align-items-center mb-2"><strong>Đi đến câu</strong><button class="btn-close" type="button" id="closeNav"></button></div>
+  <div id="navContent"></div>
+</div>
+
+<div class="az-modal-mask" id="pointModal">
+  <div class="az-modal-card">
+    <div class="az-modal-head"><strong>Chia điểm cho đề thi</strong><button type="button" class="btn-close" data-close-modal></button></div>
+    <div class="az-modal-body">
+      <div class="alert alert-light border small">Nhập điểm mỗi câu theo từng phần. Hệ thống tính tổng ngay trước khi lưu.</div>
+      <div id="pointRows"></div>
+      <div class="d-flex justify-content-between fw-bold border-top pt-3"><span>Tổng điểm</span><span id="pointTotal">0</span></div>
+    </div>
+    <div class="az-modal-foot"><button type="button" class="btn btn-outline-secondary" data-close-modal>Hủy</button><button type="button" class="btn btn-primary" id="applyPoints">Áp dụng</button></div>
+  </div>
+</div>
+
+<div class="az-modal-mask" id="infoModal">
+  <div class="az-modal-card" style="width:min(620px,96vw)">
+    <div class="az-modal-head"><strong>Cú pháp nhập đề thực chiến</strong><button type="button" class="btn-close" data-close-modal></button></div>
+    <div class="az-modal-body small">
+      <p><strong>Phần I:</strong> dùng <code>A.</code> đến <code>D.</code>, sau đó ghi <code>Đáp án: A</code>.</p>
+      <p><strong>Phần II:</strong> dùng <code>a) ... [Đúng]</code> hoặc <code>[Sai]</code>.</p>
+      <p><strong>Phần III:</strong> ghi <code>Đáp án: ...</code>. Phần IV là tự luận.</p>
+      <p class="mb-0"><strong>Lời giải:</strong> có thể viết nhiều dòng. Công thức LaTeX đặt trong <code>$...$</code>; ảnh dùng thẻ <code>&lt;img src="..."&gt;</code>.</p>
+    </div>
+  </div>
+</div>
+
+<script>window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']]},startup:{typeset:false}};</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <script>
-  const letters = ['A', 'B', 'C', 'D'];
+(function(){
+  const editor=document.getElementById('rawEditor');
+  const preview=document.getElementById('previewPane');
+  const hidden=document.getElementById('hiddenQuestions');
+  const status=document.getElementById('parseStatus');
+  const saveCount=document.getElementById('saveCount');
+  const lineNumbers=document.getElementById('lineNumbers');
+  const navPop=document.getElementById('navPop');
+  let debounce;
+  let sectionPoints={};
 
-  function renderPreview(row) {
-    const type = row.querySelector('.q-type').value;
-    const questionHtml = row.querySelector('.q-question').value;
-    const previewEl = row.querySelector('.preview-content');
-    let html = `<div class="mb-2">${questionHtml}</div>`;
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function safeRich(s){
+    const t=document.createElement('template');
+    t.innerHTML=String(s||'').replace(/\n/g,'<br>');
+    t.content.querySelectorAll('script,iframe,object,embed,style,link,form,input,button').forEach(n=>n.remove());
+    t.content.querySelectorAll('*').forEach(el=>[...el.attributes].forEach(a=>{
+      const n=a.name.toLowerCase();
+      if(n.startsWith('on')||n==='srcdoc'||n==='href')el.removeAttribute(a.name);
+      if(n==='src'&&!/^(data:image\/|https?:\/\/|\/)/i.test(a.value))el.removeAttribute(a.name);
+    }));
+    return t.innerHTML;
+  }
+  function sectionType(title){
+    const normalized=String(title||'').toUpperCase().replace(/PHAN/g,'PHẦN');
+    const m=normalized.match(/PHẦN\s*(IV|III|II|I|4|3|2|1)\b/);
+    const code=m?m[1]:'I';
+    if(code==='II'||code==='2')return 'true_false';
+    if(code==='III'||code==='3')return 'short_answer';
+    if(code==='IV'||code==='4')return 'essay';
+    return 'single_choice';
+  }
+  function defaultPoints(type){return type==='true_false'?1:type==='short_answer'?0.5:type==='essay'?2:0.25}
 
-    if (type === 'single_choice') {
-      const correctIdx = row.querySelector('.q-correct-index:checked') ? parseInt(row.querySelector('.q-correct-index:checked').value) : -1;
-      const opts = [...row.querySelectorAll('.q-option')].map(el => el.value);
-      html += '<div class="d-flex flex-column gap-1">';
-      opts.forEach((opt, k) => {
-        const isCorrect = k === correctIdx;
-        html += `<div class="${isCorrect ? 'text-success fw-bold' : ''}">${isCorrect ? '✓' : letters[k] + '.'} ${opt}</div>`;
-      });
-      html += '</div>';
-    } else if (type === 'true_false') {
-      const contents = [...row.querySelectorAll('.q-tf-content')].map(el => el.value);
-      const corrects = [...row.querySelectorAll('.q-tf-correct')].map(el => el.checked);
-      html += '<div class="d-flex flex-column gap-1">';
-      contents.forEach((c, k) => {
-        html += `<div>${String.fromCharCode(97+k)}) ${c} — <span class="${corrects[k] ? 'text-success fw-bold' : 'text-danger'}">${corrects[k] ? 'Đúng' : 'Sai'}</span></div>`;
-      });
-      html += '</div>';
-    } else if (type === 'short_answer') {
-      const ans = row.querySelector('.q-correct-answer').value;
-      html += `<div class="small">Đáp án đúng: <strong class="text-success">${ans}</strong></div>`;
-    } else {
-      html += '<div class="small text-muted">Câu tự luận — học viên nhập bài làm dài, giáo viên chấm tay sau.</div>';
+  function parse(text){
+    const lines=String(text||'').replace(/\r/g,'').split('\n');
+    const sections=[];let section=null,q=null,mode='single_choice',errors=[];
+    function ensureSection(){if(!section){section={id:'I',title:'PHẦN I: Trắc nghiệm nhiều lựa chọn',type:'single_choice',questions:[]};sections.push(section)}}
+    function finishQ(){
+      if(!q)return;
+      ensureSection();
+      q.question=q.question.trim();q.explanation=q.explanation.trim();
+      if(q.question)section.questions.push(q);
+      q=null;
     }
-
-    previewEl.innerHTML = html;
-    if (window.MathJax && window.MathJax.typesetPromise) {
-      window.MathJax.typesetPromise([previewEl]).catch(() => {});
+    function startSection(line){
+      finishQ();
+      const title=line.replace(/^\s*\[|\]\s*$/g,'').trim();
+      mode=sectionType(title);
+      const mm=title.toUpperCase().match(/PH(?:Ầ|A)N\s*(IV|III|II|I|4|3|2|1)/);
+      section={id:mm?mm[1]:String(sections.length+1),title,type:mode,questions:[]};
+      sections.push(section);
     }
-    const explEl = row.querySelector('.q-explanation');
-    const explPreview = row.querySelector('.preview-explanation');
-    if (explEl && explPreview) {
-      explPreview.style.display = explEl.value.trim() ? '' : 'none';
-      explPreview.querySelector('.expl-text').innerHTML = explEl.value;
-      if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise([explPreview]).catch(() => {});
-    }
+    lines.forEach((raw,idx)=>{
+      const line=raw.trim();
+      if(!line){if(q&&q.explanation)q.explanation+='\n';return}
+      if(/^\[\s*PH(?:Ầ|A)N\b/i.test(line)){startSection(line);return}
+      let m=line.match(/^(?:Câu|Cau|Question)\s*(\d+)\s*[\.\:\-\)]\s*(.*)$/i);
+      if(m){finishQ();ensureSection();q={number:Number(m[1]),sourceLine:idx+1,type:mode,question:m[2],points:sectionPoints[section.id]??defaultPoints(mode),options:['','','',''],correctIndex:-1,items:[null,null,null,null],correct_answer:'',explanation:'',readingExplanation:false};return}
+      if(!q){if(section)section.title+=' '+line;return}
+      m=line.match(/^([A-D])\s*[\.\)\:\-]\s*(.*)$/i);
+      if(m&&q.type==='single_choice'){q.options[m[1].toUpperCase().charCodeAt(0)-65]=m[2];q.readingExplanation=false;return}
+      m=line.match(/^([a-d])\s*[\)\.\-]\s*(.*?)(?:\s*\[(Đúng|Dung|Sai|True|False|Đ|S)\]\s*)?$/i);
+      if(m&&q.type==='true_false'){
+        const k=m[1].toLowerCase().charCodeAt(0)-97;
+        q.items[k]={content:m[2],is_correct:/^(đúng|dung|true|đ)$/i.test(m[3]||'')};q.readingExplanation=false;return
+      }
+      m=line.match(/^(?:Đáp\s*án|Dap\s*an|Đáp\s*số|Dap\s*so|ĐA)\s*[:\.]\s*(.*)$/i);
+      if(m){
+        const ans=m[1].trim();
+        if(q.type==='single_choice'&&/^[A-D]$/i.test(ans))q.correctIndex=ans.toUpperCase().charCodeAt(0)-65;
+        else q.correct_answer=ans;
+        q.readingExplanation=false;return
+      }
+      m=line.match(/^(?:Lời\s*giải|Loi\s*giai|Hướng\s*dẫn\s*giải|Huong\s*dan\s*giai)\s*[:\.]\s*(.*)$/i);
+      if(m){q.explanation=m[1];q.readingExplanation=true;return}
+      if(q.readingExplanation)q.explanation+=(q.explanation?'\n':'')+line;
+      else if(q.type==='single_choice'){
+        const last=q.options.map((v,i)=>v?i:-1).filter(i=>i>=0).pop();
+        if(last!==undefined)q.options[last]+='\n'+line;else q.question+='\n'+line;
+      }else if(q.type==='true_false'){
+        const last=q.items.map((v,i)=>v?i:-1).filter(i=>i>=0).pop();
+        if(last!==undefined)q.items[last].content+='\n'+line;else q.question+='\n'+line;
+      }else q.question+='\n'+line;
+    });
+    finishQ();
+    sections.forEach(sec=>sec.questions.forEach(item=>{
+      if(item.type==='single_choice'){
+        const n=item.options.filter(v=>String(v||'').trim()).length;
+        if(n<2)errors.push({line:item.sourceLine,msg:'Câu '+item.number+' chưa đủ phương án A–D.'});
+        if(item.correctIndex<0)errors.push({line:item.sourceLine,msg:'Câu '+item.number+' chưa có đáp án đúng.'});
+      }
+      if(item.type==='true_false'){
+        item.items=item.items.map(v=>v||{content:'',is_correct:false});
+        if(item.items.filter(v=>v.content.trim()).length<4)errors.push({line:item.sourceLine,msg:'Câu '+item.number+' chưa đủ 4 ý a–d.'});
+      }
+      if(item.type==='short_answer'&&!item.correct_answer)errors.push({line:item.sourceLine,msg:'Câu '+item.number+' chưa có đáp án ngắn.'});
+    }));
+    return {sections,questions:sections.flatMap(s=>s.questions),errors};
   }
 
-  document.querySelectorAll('.question-row').forEach(row => {
-    const select = row.querySelector('.q-type');
-    select.addEventListener('change', () => {
-      row.querySelectorAll('.q-fields').forEach(el => {
-        el.style.display = el.dataset.type === select.value ? '' : 'none';
-      });
-      renderPreview(row);
+  function field(name,value){const el=document.createElement('input');el.type='hidden';el.name=name;el.value=value==null?'':value;return el}
+  function buildHidden(questions){
+    hidden.innerHTML='';
+    questions.forEach((q,i)=>{
+      hidden.append(field(`questions[${i}][include]`,'on'));
+      hidden.append(field(`questions[${i}][type]`,q.type));
+      hidden.append(field(`questions[${i}][points]`,q.points));
+      hidden.append(field(`questions[${i}][question]`,q.question));
+      hidden.append(field(`questions[${i}][explanation]`,q.explanation||''));
+      if(q.type==='single_choice'){
+        hidden.append(field(`questions[${i}][correct_index]`,q.correctIndex));
+        q.options.forEach(v=>hidden.append(field(`questions[${i}][options][]`,v)));
+      }else if(q.type==='true_false'){
+        q.items.forEach((it,k)=>{
+          hidden.append(field(`questions[${i}][tf_content][]`,it.content));
+          if(it.is_correct)hidden.append(field(`questions[${i}][tf_correct][]`,k));
+        });
+      }else if(q.type==='short_answer')hidden.append(field(`questions[${i}][correct_answer]`,q.correct_answer||''));
     });
-    row.querySelectorAll('input, textarea').forEach(el => {
-      el.addEventListener('input', () => renderPreview(row));
-      el.addEventListener('change', () => renderPreview(row));
+  }
+  function replaceAnswerInEditor(q,letter){
+    const lines=editor.value.replace(/\r/g,'').split('\n');
+    const start=q.sourceLine-1;
+    let end=lines.length;
+    for(let i=start+1;i<lines.length;i++)if(/^(?:Câu|Cau|Question)\s*\d+\s*[\.\:\-\)]/i.test(lines[i].trim())||/^\[\s*PH(?:Ầ|A)N\b/i.test(lines[i].trim())){end=i;break}
+    let found=-1;
+    for(let i=start+1;i<end;i++)if(/^(?:Đáp\s*án|Dap\s*an|Đáp\s*số|Dap\s*so|ĐA)\s*[:\.]/i.test(lines[i].trim())){found=i;break}
+    if(found>=0)lines[found]='Đáp án: '+letter;else lines.splice(end,0,'Đáp án: '+letter);
+    editor.value=lines.join('\n');update(true);
+  }
+  function replaceTfInEditor(q,k,isCorrect){
+    const lines=editor.value.replace(/\r/g,'').split('\n');
+    const start=q.sourceLine-1;let end=lines.length;
+    for(let i=start+1;i<lines.length;i++)if(/^(?:Câu|Cau|Question)\s*\d+\s*[\.\:\-\)]/i.test(lines[i].trim())||/^\[\s*PH(?:Ầ|A)N\b/i.test(lines[i].trim())){end=i;break}
+    const letter=String.fromCharCode(97+k);
+    for(let i=start+1;i<end;i++){
+      const re=new RegExp('^\\s*'+letter+'\\s*[\\)\\.\\-]','i');
+      if(re.test(lines[i])){lines[i]=lines[i].replace(/\s*\[(?:Đúng|Dung|Sai|True|False|Đ|S)\]\s*$/i,'')+' ['+(isCorrect?'Đúng':'Sai')+']';break}
+    }
+    editor.value=lines.join('\n');update(true);
+  }
+  function render(result){
+    if(!result.questions.length)preview.innerHTML='<div class="az-empty">Chưa nhận diện được câu hỏi. Hãy nhập theo mẫu ở khung bên phải.</div>';
+    else preview.innerHTML=result.sections.map((sec,si)=>{
+      if(!sec.questions.length)return '';
+      return `<section class="az-group"><div class="az-group-head"><span class="az-group-label">Tiêu đề nhóm</span><div class="az-group-title">${esc(sec.title)}</div></div>${sec.questions.map((q,qi)=>{
+        let answers='';
+        if(q.type==='single_choice')answers=q.options.map((o,k)=>`<div class="az-answer ${k===q.correctIndex?'correct':''}" data-action="single" data-line="${q.sourceLine}" data-k="${k}"><span class="az-letter">${String.fromCharCode(65+k)}</span><div class="az-answer-text">${safeRich(o)}</div></div>`).join('');
+        else if(q.type==='true_false')answers=q.items.map((it,k)=>`<div class="az-answer ${it.is_correct?'correct':''}" data-action="tf" data-line="${q.sourceLine}" data-k="${k}" data-value="${it.is_correct?'1':'0'}"><span class="az-letter">${String.fromCharCode(97+k)}</span><div class="az-answer-text">${safeRich(it.content)} <strong>— ${it.is_correct?'Đúng':'Sai'}</strong></div></div>`).join('');
+        else if(q.type==='short_answer')answers=`<div class="small border rounded p-2">Đáp án ngắn: <strong>${safeRich(q.correct_answer)}</strong></div>`;
+        else answers='<div class="small text-muted border rounded p-2">Câu tự luận — học sinh nhập bài, giáo viên chấm tay.</div>';
+        return `<article class="az-question" id="q-${si}-${qi}" data-source-line="${q.sourceLine}"><div class="az-qbar"><span class="az-qbadge">Câu ${q.number}.</span><span class="az-qactions">Nhập điểm · Audio · Đổi câu khác</span><span class="az-qpoints">${Number(q.points).toFixed(2).replace(/\.00$/,'')} điểm</span></div><div class="az-qtext">${safeRich(q.question)}</div>${answers}${q.explanation?`<div class="az-solution"><div class="az-solution-title">Hướng dẫn giải</div>${safeRich(q.explanation)}</div>`:''}</article>`;
+      }).join('')}</section>`;
+    }).join('');
+    preview.querySelectorAll('[data-action="single"]').forEach(el=>el.onclick=()=>{
+      const q=result.questions.find(x=>x.sourceLine===Number(el.dataset.line));if(q)replaceAnswerInEditor(q,String.fromCharCode(65+Number(el.dataset.k)));
     });
-    renderPreview(row);
+    preview.querySelectorAll('[data-action="tf"]').forEach(el=>el.onclick=()=>{
+      const q=result.questions.find(x=>x.sourceLine===Number(el.dataset.line));if(q)replaceTfInEditor(q,Number(el.dataset.k),el.dataset.value!=='1');
+    });
+    buildHidden(result.questions);saveCount.textContent=result.questions.length;
+    status.innerHTML=result.errors.length?`<span class="az-error">${result.questions.length} câu · ${result.errors.length} lỗi cần xem</span>`:`Đã nhận diện ${result.questions.length} câu`;
+    renderNav(result);
+    if(window.MathJax&&window.MathJax.typesetPromise)window.MathJax.typesetPromise([preview]).catch(()=>{});
+  }
+  function renderNav(result){
+    const box=document.getElementById('navContent');
+    box.innerHTML=result.sections.map((sec,si)=>`<div class="mb-3"><div class="small fw-bold mb-2">${esc(sec.title)}</div><div class="az-nav-grid">${sec.questions.map((q,qi)=>{
+      const bad=result.errors.some(e=>e.line===q.sourceLine);return `<button type="button" class="${bad?'has-error':'ok'}" data-target="q-${si}-${qi}">${q.number}</button>`
+    }).join('')}</div></div>`).join('');
+    box.querySelectorAll('button[data-target]').forEach(b=>b.onclick=()=>{document.getElementById(b.dataset.target)?.scrollIntoView({behavior:'smooth',block:'start'});navPop.classList.remove('show')});
+  }
+  function update(immediate){
+    const result=parse(editor.value);render(result);updateLines();
+    return result;
+  }
+  function updateLines(){
+    const count=editor.value.split('\n').length;lineNumbers.textContent=Array.from({length:count},(_,i)=>i+1).join('\n');
+    lineNumbers.scrollTop=editor.scrollTop;
+  }
+  editor.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(update,150);updateLines()});
+  editor.addEventListener('scroll',()=>{lineNumbers.scrollTop=editor.scrollTop});
+
+  function insertAtCursor(text){const a=editor.selectionStart,b=editor.selectionEnd;editor.setRangeText(text,a,b,'end');editor.focus();update()}
+  document.getElementById('insertSection').onclick=()=>{
+    const type=prompt('Nhập 1, 2, 3 hoặc 4:\n1 = Trắc nghiệm A-D\n2 = Đúng/Sai\n3 = Trả lời ngắn\n4 = Tự luận','1');
+    const templates={
+      '1':'\n[PHẦN I: Thí sinh chỉ chọn một phương án.]\nCâu 1. Nội dung câu hỏi\nA. Phương án A\nB. Phương án B\nC. Phương án C\nD. Phương án D\nĐáp án: A\n',
+      '2':'\n[PHẦN II: Trong mỗi ý a), b), c), d), chọn Đúng hoặc Sai.]\nCâu 1. Nội dung câu hỏi\na) Ý thứ nhất [Đúng]\nb) Ý thứ hai [Sai]\nc) Ý thứ ba [Sai]\nd) Ý thứ tư [Đúng]\n',
+      '3':'\n[PHẦN III: Trả lời ngắn.]\nCâu 1. Nội dung câu hỏi\nĐáp án: 0\n',
+      '4':'\n[PHẦN IV: Tự luận.]\nCâu 1. Nội dung câu hỏi\n'
+    };if(templates[type])insertAtCursor(templates[type]);
+  };
+  document.getElementById('insertFormula').onclick=()=>insertAtCursor('$\\frac{a}{b}$');
+  document.getElementById('insertImage').onclick=()=>{const u=prompt('Dán link ảnh https://...');if(u)insertAtCursor(`<img src="${u}">`)};
+  document.getElementById('uploadAgain').onclick=()=>location.href='/admin/bai-kiem-tra/<%= quiz.id %>/tai-de';
+  document.getElementById('formatBtn').onclick=()=>{
+    editor.value=editor.value.replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').replace(/^\s+(?=\S)/gm,'').replace(/^(Câu\s*\d+)\s*[:\-]\s*/gim,'$1. ').trim();update();
+  };
+  document.getElementById('jumpBtn').onclick=()=>navPop.classList.toggle('show');
+  document.getElementById('closeNav').onclick=()=>navPop.classList.remove('show');
+  document.getElementById('infoBtn').onclick=()=>document.getElementById('infoModal').classList.add('show');
+  document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=()=>b.closest('.az-modal-mask').classList.remove('show'));
+
+  document.getElementById('pointBtn').onclick=()=>{
+    const r=parse(editor.value),rows=document.getElementById('pointRows');
+    rows.innerHTML=r.sections.filter(s=>s.questions.length).map((s,i)=>`<div class="az-point-row"><div><strong>${esc(s.title)}</strong><div class="small text-muted">${s.questions.length} câu</div></div><input class="form-control form-control-sm section-point" data-id="${esc(s.id)}" type="number" min="0" step="0.05" value="${sectionPoints[s.id]??defaultPoints(s.type)}"><div class="small text-end section-subtotal">0 điểm</div></div>`).join('');
+    function calc(){let total=0;rows.querySelectorAll('.section-point').forEach((inp,i)=>{const sec=r.sections.filter(s=>s.questions.length)[i];const sub=(Number(inp.value)||0)*sec.questions.length;total+=sub;inp.closest('.az-point-row').querySelector('.section-subtotal').textContent=sub.toFixed(2)+' điểm'});document.getElementById('pointTotal').textContent=total.toFixed(2)+' điểm'}
+    rows.querySelectorAll('input').forEach(i=>i.oninput=calc);calc();document.getElementById('pointModal').classList.add('show');
+  };
+  document.getElementById('applyPoints').onclick=()=>{
+    document.querySelectorAll('.section-point').forEach(i=>sectionPoints[i.dataset.id]=Number(i.value)||0);
+    document.getElementById('pointModal').classList.remove('show');update();
+  };
+  document.getElementById('validateBtn').onclick=()=>{
+    const r=parse(editor.value);alert(r.errors.length?r.errors.map(e=>'Dòng '+e.line+': '+e.msg).join('\n'):'Đề hợp lệ: '+r.questions.length+' câu hỏi.');
+  };
+  document.getElementById('saveExamForm').addEventListener('submit',e=>{
+    const r=parse(editor.value);
+    if(!r.questions.length){e.preventDefault();alert('Chưa có câu hỏi hợp lệ để lưu.');return}
+    if(r.errors.length&&!confirm('Còn '+r.errors.length+' lỗi nhận diện. Bạn vẫn muốn tiếp tục lưu?'))e.preventDefault();
   });
+  update();
+})();
 </script>
 
 <%- include('../../partials/admin-footer') %>
