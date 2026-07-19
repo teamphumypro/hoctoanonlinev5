@@ -184,6 +184,24 @@ async function convertAllWmfImages(zip, relMap) {
 
   // ---- Cach 1 (uu tien): JS thuan, khong can phan mem ngoai ----
   try {
+    // emf-converter duoc viet cho trinh duyet va dung FileReader de doi Blob thanh data URL.
+    // Node 20 co Blob nhung khong co FileReader, vi vay can polyfill nho nay truoc khi require.
+    if (typeof globalThis.FileReader === 'undefined') {
+      globalThis.FileReader = class NodeFileReader {
+        constructor() { this.result = null; this.error = null; this.onload = null; this.onerror = null; }
+        async readAsDataURL(blob) {
+          try {
+            const ab = await blob.arrayBuffer();
+            const mime = blob.type || 'application/octet-stream';
+            this.result = `data:${mime};base64,${Buffer.from(ab).toString('base64')}`;
+            if (typeof this.onload === 'function') this.onload({ target: this });
+          } catch (err) {
+            this.error = err;
+            if (typeof this.onerror === 'function') this.onerror({ target: this });
+          }
+        }
+      };
+    }
     const { convertWmfToDataUrl, convertEmfToDataUrl } = require('emf-converter');
     const canvasModule = require('@napi-rs/canvas');
     // emf-converter can co OffscreenCanvas/HTMLCanvasElement ton tai san trong moi truong chay —
