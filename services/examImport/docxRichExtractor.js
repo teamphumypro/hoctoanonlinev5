@@ -54,7 +54,7 @@ async function extractDocxRich(filePath) {
     return null;
   }
 
-  // Duyet de tim r:embed (id anh nhung) o bat ky do sau trong 1 nhanh XML
+  // Duyet de tim r:embed HOAC r:id (VML dung r:id, DrawingML dung r:embed) o bat ky do sau trong 1 nhanh XML
   function findEmbedId(node) {
     if (Array.isArray(node)) {
       for (const item of node) {
@@ -67,7 +67,7 @@ async function extractDocxRich(filePath) {
       if (node[':@']) {
         const attrs = node[':@'];
         for (const key of Object.keys(attrs)) {
-          if (key.endsWith(':embed') || key === '@_r:embed') return attrs[key];
+          if (key.endsWith(':embed') || key.endsWith(':id') || key === '@_r:embed' || key === '@_r:id') return attrs[key];
         }
       }
       for (const key of Object.keys(node)) {
@@ -125,7 +125,7 @@ async function extractDocxRich(filePath) {
       } else if (tag === 'm:oMath' || tag === 'm:oMathPara') {
         const mathml = ommlNodeToMathml(content);
         if (mathml) text += `[[MATH:${encodeURIComponent(mathml)}]]`;
-      } else if (tag === 'w:drawing' || tag === 'w:pict') {
+      } else if (tag === 'w:drawing' || tag === 'w:pict' || tag === 'w:object') {
         const embedId = findEmbedId(content);
         if (embedId) await addImageFromEmbedId(embedId);
       } else if (tag === 'w:p') {
