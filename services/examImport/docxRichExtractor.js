@@ -110,6 +110,34 @@ async function extractDocxRich(filePath) {
     text += `[[IMG:${idx}]]`;
   }
 
+  // Cong thuc MathType kieu cu (Equation.DSMT4/MathType 6+) khong nam trong w:drawing (DrawingML)
+  // ma nam trong w:object > v:shape > v:imagedata r:id="..." (VML) kem theo o:OLEObject rieng.
+  // Neu chi tim r:embed (DrawingML) se khong thay gi va cong thuc bi mat trang tuyet doi, khong con
+  // ca placeholder canh bao. Ham nay tim rieng thuoc tinh r:id cua the v:imagedata (anh xem truoc
+  // cua OLE, thuong la .wmf/.emf) de tai dung anh cong thuc, khong nham voi r:id cua o:OLEObject
+  // (tro toi du lieu OLE nhi phan that su, khong hien thi truc tiep duoc).
+  function findVmlImageDataId(node) {
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = findVmlImageDataId(item);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (node && typeof node === 'object') {
+      for (const key of Object.keys(node)) {
+        if (key === ':@') continue;
+        if (key === 'v:imagedata') {
+          const attrs = node[':@'];
+          if (attrs && attrs['@_r:id']) return attrs['@_r:id'];
+        }
+        const found = findVmlImageDataId(node[key]);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
   // Duyet toan bo cay theo dung thu tu tai lieu: gap w:t -> ghi chu, gap m:oMath -> chen cong thuc,
   // gap w:drawing -> chen anh, cac the khac duyet sau vao ben trong theo dung thu tu
   async function walk(nodeArr) {
@@ -125,9 +153,16 @@ async function extractDocxRich(filePath) {
       } else if (tag === 'm:oMath' || tag === 'm:oMathPara') {
         const mathml = ommlNodeToMathml(content);
         if (mathml) text += `[[MATH:${encodeURIComponent(mathml)}]]`;
-      } else if (tag === 'w:drawing' || tag === 'w:pict') {
+      } else if (tag === 'w:drawing') {
         const embedId = findEmbedId(content);
         if (embedId) await addImageFromEmbedId(embedId);
+      } else if (tag === 'w:pict' || tag === 'w:object') {
+        // w:object: cong thuc MathType/Equation OLE cu. w:pict: anh VML cu.
+        // Uu tien r:id cua v:imagedata (anh xem truoc WMF/EMF hien thi duoc); chi khi khong co
+        // moi thu r:embed (truong hop hiem gap DrawingML long trong w:pict).
+        const embedId = findVmlImageDataId(content) || findEmbedId(content);
+        if (embedId) await addImageFromEmbedId(embedId);
+        else text += ' [công thức - chưa hiển thị được, vui lòng sửa tay] ';
       } else if (tag === 'w:p') {
         await walk(content);
         text += '\n\n';
@@ -195,14 +230,29 @@ async function convertAllWmfImages(zip, relMap) {
     }
     if (writtenPaths.length === 0) return {};
 
-    await new Promise((resolve) => {
-      execFile('soffice', ['--headless', '--convert-to', 'png', '--outdir', tmpDir, ...writtenPaths.map(w => w.localPath)],
-        { timeout: 180000 }, (err) => resolve(err)); // du co loi cung resolve, khong reject, de luon roi vao nhanh du phong ben duoi
+    // LibreOffice headless "--convert-to" khi nhan mot lan qua nhieu file (vd > 100 cong thuc)
+    // hay bo sot mot so file mot cach im lang (khong bao loi, chi don gian khong sinh PNG output).
+    // De khong lam mat cong thuc mot cach vo tinh, chia nho thanh tung lo (batch) va lam lai
+    // (retry) rieng cho nhung file van con thieu sau moi lan, toi da 3 vong.
+    const runBatch = (paths) => new Promise((resolve) => {
+      if (paths.length === 0) return resolve();
+      execFile('soffice', ['--headless', '--convert-to', 'png', '--outdir', tmpDir, ...paths],
+        { timeout: 180000 }, () => resolve()); // du co loi cung resolve, khong reject
     });
+
+    const pngPathFor = (w) => path.join(tmpDir, w.localName.replace(/\.(wmf|emf)$/i, '.png'));
+    const BATCH_SIZE = 40;
+    for (let round = 0; round < 3; round++) {
+      const missing = writtenPaths.filter(w => !fs.existsSync(pngPathFor(w)));
+      if (missing.length === 0) break;
+      for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+        await runBatch(missing.slice(i, i + BATCH_SIZE).map(w => w.localPath));
+      }
+    }
 
     const result = {};
     for (const w of writtenPaths) {
-      const pngPath = path.join(tmpDir, w.localName.replace(/\.(wmf|emf)$/i, '.png'));
+      const pngPath = pngPathFor(w);
       if (fs.existsSync(pngPath)) {
         result[w.target] = fs.readFileSync(pngPath).toString('base64');
       }
