@@ -12,6 +12,19 @@
   <a href="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" class="btn btn-outline-secondary btn-sm">Tải file khác</a>
 </div>
 <% if (aiError) { %><div class="alert alert-warning py-2 small">AI không xử lý được nên hệ thống đã dùng bộ nhận diện nội bộ: <%= aiError %></div><% } %>
+<% if (typeof formulaWarning !== 'undefined' && formulaWarning) { %>
+<div class="alert alert-danger py-2 small">
+  <strong>⚠ Một số công thức toán chưa hiển thị được</strong>
+  (đang thấy chữ "<code>[công thức - chưa hiển thị được, vui lòng sửa tay]</code>" thay vì ảnh công thức).<br>
+  <% if (formulaWarning.sofficeMissing) { %>
+    Nguyên nhân: server hiện <strong>chưa cài LibreOffice</strong> — cần thiết để chuyển công thức MathType (WMF) trong file Word thành ảnh.
+    Trên Render, vào <strong>Settings → Environment</strong> của service và đảm bảo đang chạy bằng <strong>Docker</strong> (dùng đúng <code>Dockerfile</code> đi kèm dự án), không phải môi trường Node thường.
+    Nếu service được tạo thủ công (không qua Blueprint từ <code>render.yaml</code>), thường bị mặc định sang Node và thiếu LibreOffice.
+  <% } else { %>
+    Server đã có LibreOffice nhưng một vài công thức riêng lẻ vẫn chuyển đổi lỗi — hãy tải lại đúng file này, hoặc sửa tay công thức bị thiếu ở khung bên phải.
+  <% } %>
+</div>
+<% } %>
 
 <form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="saveForm">
 <input type="hidden" name="redirect_to" value="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>">

@@ -64,7 +64,18 @@ exports.upload = async (req, res) => {
       }
     }
 
-    res.render('admin/quizzes/import-review', { quiz, questions, usedAI, aiError });
+    // Neu bat ky cau hoi nao con chua "[cong thuc - chua hien thi duoc...]" (rieng WMF khong
+    // chuyen doi duoc), hien canh bao ro rang tren man hinh thay vi de admin tu doan qua giao dien.
+    const FORMULA_FALLBACK_MARK = 'chưa hiển thị được, vui lòng sửa tay';
+    const questionsJson = JSON.stringify(questions);
+    const hasMissingFormula = questionsJson.includes(FORMULA_FALLBACK_MARK);
+    const { checkSystemDependencies } = require('../services/examImport/systemCheck');
+    const sysDeps = checkSystemDependencies();
+
+    res.render('admin/quizzes/import-review', {
+      quiz, questions, usedAI, aiError,
+      formulaWarning: hasMissingFormula ? { sofficeMissing: !sysDeps.soffice } : null
+    });
   } catch (err) {
     console.error('Loi doc file de thi:', err);
     if (filePath) fs.unlink(filePath, () => {});
