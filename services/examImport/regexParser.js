@@ -78,10 +78,23 @@ function findQuestionMarkers(text) {
   return markers;
 }
 
+function findSectionHeaderStarts(text) {
+  const re = /(?:^|\n)\s*(?:PHẦN|PHAN|PART)\s*(?:I{1,6}|\d+)\b/gi;
+  const starts = [];
+  let m;
+  while ((m = re.exec(text))) starts.push(m.index + (m[0].startsWith('\n') ? 1 : 0));
+  return starts;
+}
+
 function splitQuestionBlocks(text) {
   const markers = findQuestionMarkers(text);
+  const sectionStarts = findSectionHeaderStarts(text);
   return markers.map((marker, index) => {
-    const end = index + 1 < markers.length ? markers[index + 1].start : text.length;
+    let end = index + 1 < markers.length ? markers[index + 1].start : text.length;
+    // Câu cuối cùng của 1 phần không được kéo theo tiêu đề "PHẦN ..." kế tiếp vào nội dung của nó -
+    // đây là nguyên nhân câu cuối 1 phần từng bị lẫn chữ "đúng/sai" hay nội dung của phần sau vào thân câu.
+    const nextSectionStart = sectionStarts.find(s => s > marker.contentStart && s < end);
+    if (nextSectionStart != null) end = nextSectionStart;
     return {
       ...marker,
       end,
@@ -103,17 +116,26 @@ function splitDocument(raw) {
   const explicitSolution = /(?:^|\n)\s*(?:LỜI\s*GIẢI(?:\s*THAM\s*KHẢO)?|HƯỚNG\s*DẪN\s*GIẢI|SOLUTION|EXPLANATION)\b/i.exec(tail);
   let solutionIndex = explicitSolution ? explicitSolution.index : -1;
   if (solutionIndex < 0) {
-    // Bảng đáp án thường cũng có tiêu đề “Phần I”, vì vậy chỉ coi là lời giải từ
-    // lần xuất hiện Phần I tiếp theo sau vùng bảng đáp án.
-    const sectionStarts = [];
-    const sectionRe = /(?:^|\n)\s*(?:PHẦN|PHAN|PART)\s*(?:I|1)\s*[:.\-]?/gi;
+    // Bảng đáp án thường cũng có tiêu đề “Phần I / Phần II / Phần III”, và sau đó lời giải lặp lại
+    // đúng chu kỳ đó (Phần I, Phần II, Phần III) một lần nữa. Vì vậy lời giải bắt đầu từ lần thứ 2
+    // mà số phần "quay lại" đúng số của phần đầu tiên xuất hiện trong tail (ví dụ Phần I xuất hiện
+    // lại lần 2). Dùng \b (ranh giới từ) khi bắt số La Mã để "Phần I" KHÔNG bị khớp nhầm là tiền tố
+    // của "Phần II"/"Phần III" - đây là nguyên nhân đề 3 phần từng bị cắt sai đáp án Phần II/III.
+    const sectionRe = /(?:^|\n)\s*(?:PHẦN|PHAN|PART)\s*(I{1,6}|\d+)\b/gi;
+    const occurrences = [];
     let sm;
-    while ((sm = sectionRe.exec(tail))) sectionStarts.push(sm.index);
-    if (sectionStarts.length >= 2) solutionIndex = sectionStarts[1];
-    else if (sectionStarts.length === 1) {
-      const after = tail.slice(sectionStarts[0]);
-      if (/\n\s*(?:Câu|Cau|Question)\s*1(?:\s*[.:)]|\s*\n)/i.test(after) && !/Đáp\s*án/i.test(after.slice(0, 200))) {
-        solutionIndex = sectionStarts[0];
+    while ((sm = sectionRe.exec(tail))) occurrences.push({ index: sm.index, number: romanToNumber(sm[1]) });
+
+    if (occurrences.length) {
+      const firstNumber = occurrences[0].number;
+      const restartAt = occurrences.findIndex((o, i) => i > 0 && o.number === firstNumber);
+      if (restartAt > 0) {
+        solutionIndex = occurrences[restartAt].index;
+      } else if (occurrences.length === 1) {
+        const after = tail.slice(occurrences[0].index);
+        if (/\n\s*(?:Câu|Cau|Question)\s*1(?:\s*[.:)]|\s*\n)/i.test(after) && !/Đáp\s*án/i.test(after.slice(0, 200))) {
+          solutionIndex = occurrences[0].index;
+        }
       }
     }
   }
@@ -162,7 +184,7 @@ function parseGenericAnswerKeys(answerText) {
     }
 
     // Trả lời ngắn theo bảng: hàng số câu + hàng đáp án tự do.
-    const short = /Câu\s+((?:\d+\s+){1,}\d+)\s*Đáp\s*án\s+([\s\S]+?)(?=\n\s*(?:PHẦN|PHAN|PART|$))/i.exec(chunk);
+    const short = /Câu\s+((?:\d+\s+){1,}\d+)\s*Đáp\s*án\s+([\s\S]+?)(?=\n\s*(?:PHẦN|PHAN|PART)|$)/i.exec(chunk);
     if (short) {
       const nums = short[1].match(/\d+/g).map(Number);
       let vals = short[2].trim().split(/\s+/).filter(Boolean);
@@ -203,7 +225,7 @@ function splitInlineOptions(body) {
   const protectedData = protectAssets(body);
   const text = protectedData.text;
   // Nhãn phải ở đầu dòng hoặc sau khoảng trắng; lookahead tới nhãn tiếp theo từ A-H hoặc hết câu.
-  const markerRe = /(?:^|[\n\t ]{1,})([A-H])\s*[.)]\s*/g;
+  const markerRe = /(?:^|[\n\t ]{1,})([A-H])\s*[.)][ \t]*/g;
   const markers = [];
   let m;
   while ((m = markerRe.exec(text))) {
@@ -240,7 +262,7 @@ function splitInlineOptions(body) {
 function splitTrueFalse(body) {
   const protectedData = protectAssets(body);
   const text = protectedData.text;
-  const re = /(?:^|\n|\s{2,})([a-h])\s*[.)]\s*/gi;
+  const re = /(?:^|\n|\s{2,})([a-h])\s*[.)][ \t]*/gi;
   const markers = [];
   let m;
   while ((m = re.exec(text))) markers.push({ label: m[1].toLowerCase(), start: m.index, contentStart: re.lastIndex });
@@ -260,7 +282,12 @@ function extractInlineAnswer(body) {
 }
 
 function cleanInline(value, images) {
-  return restoreImages(String(value || '').replace(/\n{2,}/g, '\n').trim(), images);
+  const withImages = restoreImages(String(value || '').replace(/\n{2,}/g, '\n').trim(), images);
+  // Lop bao ve dau tien: neu con sot placeholder tham chieu (vd kieu Azota [!m:$mathtype_2$])
+  // ma khong resolve duoc, khong duoc de nguyen tho - phai thay bang canh bao ro rang ngay tu
+  // luc parse, de nguoi duyet thay va tu chen lai truoc khi luu (xem services/examImport/mathReference.js).
+  const { sanitizeMathReferences } = require('./mathReference');
+  return sanitizeMathReferences(withImages).text;
 }
 
 function parseExamText(rawText, images = []) {
