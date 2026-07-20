@@ -1,15 +1,13 @@
 <% var pageTitle = 'Bảng điểm: ' + quiz.title %>
 <%- include('../../partials/admin-header') %>
-<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <% if (pending.length > 0) { %>
 <div class="card p-3 mb-3 border-warning">
   <h6 class="fw-bold mb-2">✍️ Cần chấm tay (<%= pending.length %> bài)</h6>
   <% pending.forEach(p => { %>
     <div class="border rounded p-2 mb-2">
-      <div class="small text-muted">Học viên: <strong><%= p.user_name %></strong> — Câu hỏi: <%= p.question %> (tối đa <%= p.max_points %>đ)</div>
-      <div class="essay-answer-render my-2" id="answerRender<%= p.id %>"></div>
-      <script type="application/json" id="answerJson<%= p.id %>"><%- JSON.stringify(p.answer_text || '').replace(/</g, '\\u003c') %></script>
+      <div class="small text-muted">Học viên: <strong><%= p.user_name %></strong> — Câu hỏi: <%- p.question %> (tối đa <%= p.max_points %>đ)</div>
+      <div class="p-2 bg-light rounded my-2"><%- p.answer_text %></div>
       <form method="POST" action="/admin/bai-kiem-tra/cham-tay" class="d-flex gap-2 align-items-center">
         <input type="hidden" name="answer_id" value="<%= p.id %>">
         <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
@@ -69,17 +67,4 @@
   </table>
 </div>
 
-<script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']] } };</script>
-<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script src="/js/math-essay-editor.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.essay-answer-render').forEach(function (el) {
-    const id = el.id.replace('answerRender','');
-    const holder = document.getElementById('answerJson'+id);
-    let raw = ''; try { raw = JSON.parse(holder.textContent); } catch(e) { raw = holder.textContent; }
-    window.MathEssayEditor.renderAnswer(el, raw);
-  });
-});
-</script>
 <%- include('../../partials/admin-footer') %>

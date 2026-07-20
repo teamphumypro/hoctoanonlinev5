@@ -1,0 +1,91 @@
+<% var pageTitle = 'Xem trước & sửa trước khi lưu' %>
+<%- include('../../partials/admin-header') %>
+
+<h5 class="fw-bold mb-1">Xem trước & sửa trước khi lưu</h5>
+<p class="small text-muted mb-3">
+  Nhận diện được <strong><%= questions.length %></strong> câu hỏi. Công thức đã được chuyển từ file Word
+  sang ảnh, giữ đúng vị trí trong câu. Câu nào có nhãn vàng là <strong>chưa tự tìm được đáp án</strong> —
+  bạn cần tự chọn trước khi lưu. Có thể sửa trực tiếp nội dung/công thức ngay trong khung xem trước.
+</p>
+
+<% if (error) { %><div class="alert alert-warning small"><%= error %></div><% } %>
+
+<form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="reviewForm">
+  <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
+  <input type="hidden" name="redirect_to" value="/admin/bai-kiem-tra/<%= quiz.id %>/cau-hoi">
+
+  <% questions.forEach((q, idx) => { %>
+    <div class="card p-3 mb-2 <%= q.needsReview ? 'border-warning' : '' %>">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <input type="checkbox" name="questions[<%= idx %>][include]" checked>
+        <strong class="small">Câu <%= q.number %><%= q.section ? ' — Phần ' + q.section : '' %></strong>
+        <% if (q.needsReview) { %><span class="badge bg-warning text-dark">chưa rõ đáp án — kiểm tra lại</span><% } %>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-auto">
+          <label class="form-label small mb-0">Dạng câu</label>
+          <select name="questions[<%= idx %>][type]" class="form-select form-select-sm type-select">
+            <option value="single_choice" <%= q.type==='single_choice'?'selected':'' %>>Trắc nghiệm nhiều lựa chọn</option>
+            <option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Đúng / sai</option>
+            <option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Trả lời ngắn</option>
+            <option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0">Điểm</label>
+          <input type="number" step="0.25" name="questions[<%= idx %>][points]" value="<%= q.type==='true_false'?1:(q.type==='essay'?2:0.25) %>" class="form-control form-control-sm" style="width:80px">
+        </div>
+      </div>
+
+      <label class="form-label small mb-0">Nội dung câu hỏi (có thể sửa trực tiếp)</label>
+      <div class="stem-edit border rounded p-2 mb-2" contenteditable="true" style="min-height:40px; font-size:14px;"><%- q.stem %></div>
+      <input type="hidden" name="questions[<%= idx %>][stem]" class="stem-input">
+      <input type="hidden" name="questions[<%= idx %>][number]" value="<%= q.number %>">
+
+      <% if (q.type === 'single_choice' || q.type === 'true_false') { %>
+        <div class="options-wrap">
+          <% q.options.forEach((o, oi) => { %>
+            <div class="d-flex align-items-start gap-2 mb-1">
+              <% if (q.type === 'single_choice') { %>
+                <input type="radio" name="questions[<%= idx %>][correct_index]" value="<%= oi %>" <%= q.correctIndex===oi?'checked':'' %> style="margin-top:8px;">
+              <% } else { %>
+                <input type="checkbox" name="questions[<%= idx %>][tf_correct][]" value="<%= oi %>" <%= (q.correctFlags||[])[oi]?'checked':'' %> style="margin-top:8px;">
+              <% } %>
+              <span class="small text-muted" style="margin-top:6px;"><%= o.label %>.</span>
+              <div class="option-edit border rounded p-2 flex-grow-1" contenteditable="true" style="font-size:14px;"><%- o.text %></div>
+              <input type="hidden" name="questions[<%= idx %>][<%= q.type==='single_choice'?'option_text':'item_text' %>][]" class="option-input">
+            </div>
+          <% }) %>
+        </div>
+      <% } else if (q.type === 'short_answer') { %>
+        <label class="form-label small mb-0">Đáp án đúng</label>
+        <input type="text" name="questions[<%= idx %>][correct_answer]" value="<%= (q.correctAnswerText||'').replace(/\"/g,'&quot;') %>" class="form-control form-control-sm" style="max-width:240px">
+      <% } %>
+
+      <div class="mt-2">
+        <label class="form-label small mb-0">Lời giải (tự động dò được từ file, có thể sửa — hiện sau khi học sinh nộp bài)</label>
+        <textarea name="questions[<%= idx %>][explanation]" class="form-control form-control-sm" rows="1"><%- q.explanation || '' %></textarea>
+      </div>
+    </div>
+  <% }) %>
+
+  <div class="card p-3 mt-2">
+    <button class="btn btn-primary" style="width:fit-content">Lưu đề thi</button>
+  </div>
+</form>
+
+<script>
+document.getElementById('reviewForm').addEventListener('submit', () => {
+  document.querySelectorAll('.stem-edit').forEach(el => {
+    el.parentElement.querySelector('.stem-input').value = el.innerHTML;
+  });
+  document.querySelectorAll('.options-wrap').forEach(wrap => {
+    wrap.querySelectorAll('.option-edit').forEach(el => {
+      el.parentElement.querySelector('.option-input').value = el.innerHTML;
+    });
+  });
+});
+</script>
+
+<%- include('../../partials/admin-footer') %>

@@ -1,0 +1,26 @@
+<% var pageTitle = 'Tải đề thi Word' %>
+<%- include('../../partials/admin-header') %>
+
+<div class="card p-4" style="max-width:600px">
+  <h6 class="fw-bold mb-1">Tải đề thi từ file Word (.docx)</h6>
+  <p class="small text-muted mb-3">Bài kiểm tra: <strong><%= quiz.title %></strong></p>
+
+  <% if (error) { %><div class="alert alert-danger small"><%= error %></div><% } %>
+
+  <div class="alert alert-secondary small">
+    Hệ thống sẽ đọc trực tiếp file Word, giữ nguyên công thức toán (chuyển từ MathType/Equation
+    sang ảnh đúng vị trí trong câu), tự tách câu hỏi/phương án, và tự tìm đáp án đúng từ phần lời
+    giải hoặc bảng đáp án trong file. Bạn xem lại và sửa ở bước tiếp theo trước khi lưu.
+  </div>
+
+  <form method="POST" action="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label class="form-label">Chọn file Word (.docx) đề thi (nên có kèm đáp án/lời giải)</label>
+      <input type="file" name="exam_file" class="form-control" accept=".docx" required>
+    </div>
+    <button class="btn btn-primary">Tải lên và phân tích</button>
+    <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary">Hủy</a>
+  </form>
+</div>
+
+<%- include('../../partials/admin-footer') %>

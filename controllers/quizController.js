@@ -52,10 +52,14 @@ exports.submit = async (req, res) => {
 
   // Dung nap du lieu tu form: cau trac nghiem/tra loi ngan gui answers[qid],
   // cau dung-sai gui answers_tf[qid][itemId], cau tu luan gui essay[qid]
+  const { sanitizeEssayHtml } = require('../services/security/sanitizeHtml');
   const answers = {};
   Object.entries(req.body.answers || {}).forEach(([qid, val]) => { answers[qid] = val; });
   Object.entries(req.body.answers_tf || {}).forEach(([qid, val]) => { answers[qid] = val; });
-  Object.entries(req.body.essay || {}).forEach(([qid, val]) => { answers[qid] = val; });
+  // Bai lam tu luan la HTML (chu + cong thuc chen kieu Word + anh viet tay) hoc sinh tu nhap -
+  // BAT BUOC loc truoc khi luu, vi noi dung nay se duoc hien thi lai KHONG ESCAPE cho giao vien
+  // xem luc cham bai (xem services/security/sanitizeHtml.js).
+  Object.entries(req.body.essay || {}).forEach(([qid, val]) => { answers[qid] = sanitizeEssayHtml(val); });
 
   const result = await Quiz.grade(quiz.id, answers);
   const attempt = await Quiz.recordAttempt({

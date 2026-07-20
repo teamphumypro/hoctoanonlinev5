@@ -1,6 +1,5 @@
 <% var pageTitle = 'Kết quả bài kiểm tra' %>
 <%- include('partials/header') %>
-<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <div class="row justify-content-center">
   <div class="col-lg-8">
@@ -47,9 +46,8 @@
             <div class="small <%= d.isCorrect ? 'text-success' : 'text-danger' %>"><%= d.isCorrect ? '✓ Đúng' : '✗ Chưa đúng' %></div>
 
           <% } else if (d.type === 'essay') { %>
-            <div class="small text-warning mb-2">Câu tự luận — đang chờ giáo viên chấm tay</div>
-            <div class="essay-answer-render" id="resultEssay<%= i %>"></div>
-            <script type="application/json" id="resultEssayJson<%= i %>"><%- JSON.stringify(d.yourAnswer || '').replace(/</g, '\\u003c') %></script>
+            <div class="small text-warning mb-1">Câu tự luận — đang chờ giáo viên chấm tay</div>
+            <% if (d.yourAnswer) { %><div class="p-2 bg-light rounded small"><%- d.yourAnswer %></div><% } %>
           <% } %>
         </div>
       <% }) %>
@@ -58,17 +56,5 @@
 </div>
 
 <script>window.MathJax = { tex: { inlineMath: [['$','$']] } };</script>
-<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script src="/js/math-essay-editor.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('[id^="resultEssay"]:not([type])').forEach(function (el) {
-    if (!el.classList.contains('essay-answer-render')) return;
-    const i = el.id.replace('resultEssay','');
-    const holder = document.getElementById('resultEssayJson'+i);
-    let raw=''; try { raw=JSON.parse(holder.textContent); } catch(e) { raw=holder.textContent; }
-    window.MathEssayEditor.renderAnswer(el, raw);
-  });
-});
-</script>
+<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
 <%- include('partials/footer') %>
