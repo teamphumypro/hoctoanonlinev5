@@ -7,7 +7,9 @@
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "test": "node tests/examImport.test.js"
+    "test": "node scripts/check-source-integrity.js && node tests/examImport.test.js && node tests/examImportV2.test.js && node tests/examImportV4.test.js",
+    "check:source": "node scripts/check-source-integrity.js",
+    "prestart": "node scripts/check-source-integrity.js"
   },
   "dependencies": {
     "pg": "^8.11.5",

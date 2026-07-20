@@ -129,12 +129,8 @@ async function convertVectorAssets(zip, relMap) {
   try {
     if (typeof global.FileReader === 'undefined') {
       global.FileReader = class FileReader {
-<<<<<<< HEAD
         readAsArrayBuffer(blob) { Promise.resolve(blob.arrayBuffer ? blob.arrayBuffer() : blob).then(v => { this.result = v; if (this.onload) this.onload({ target: this }); }).catch(e => { this.error=e; if (this.onerror) this.onerror(e); }); }
         readAsDataURL(blob) { Promise.resolve(blob.arrayBuffer ? blob.arrayBuffer() : blob).then(v => { const buf=Buffer.from(v); const mime=(blob && blob.type)||'application/octet-stream'; this.result=`data:${mime};base64,${buf.toString('base64')}`; if (this.onload) this.onload({ target: this }); }).catch(e => { this.error=e; if (this.onerror) this.onerror(e); }); }
-=======
-        readAsArrayBuffer(blob) { Promise.resolve(blob.arrayBuffer ? blob.arrayBuffer() : blob).then(v => { this.result = v; if (this.onload) this.onload({ target: this }); }).catch(e => this.onerror && this.onerror(e)); }
->>>>>>> b3c7bcd7f3cd03badf18e3bb8862ae1ea75f5f29
       };
     }
     const { convertWmfToDataUrl, convertEmfToDataUrl } = require('emf-converter');
@@ -151,7 +147,6 @@ async function convertVectorAssets(zip, relMap) {
   } catch (error) { console.warn('[exam-import] vector converter unavailable:', error.message); }
   return output;
 }
-<<<<<<< HEAD
 async function normalizeFormulaPng(dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:image/png;base64,')) return dataUrl;
   try {
@@ -189,6 +184,4 @@ async function normalizeFormulaPng(dataUrl) {
   }
 }
 
-=======
->>>>>>> b3c7bcd7f3cd03badf18e3bb8862ae1ea75f5f29
 module.exports = { extractDocxAzota };

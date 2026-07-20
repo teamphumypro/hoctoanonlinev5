@@ -2,7 +2,7 @@ const fs = require('fs');
 const Quiz = require('../models/Quiz');
 const Settings = require('../models/Settings');
 const { downloadFromDriveLink } = require('../services/examImport/extractText');
-const { importExam } = require('../services/examImport/examImportEngine');
+const { importExam } = require('../services/exam-import');
 const { parseWithAI } = require('../services/ai/examAiParser');
 
 // Dung chung cho ca 2 truong hop: de gan voi 1 bai hoc (co lesson) hoac de doc lap trong Thuc chien phong thi
