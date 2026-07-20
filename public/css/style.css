@@ -136,10 +136,3 @@ code{ background:#f0f0f7; padding:.15em .45em; border-radius:5px; color:var(--na
 .nav-tabs{ border-bottom:1px solid var(--line); }
 .nav-tabs .nav-link{ border:none; color:var(--muted); font-weight:600; padding:.6rem 1rem; border-radius:0; }
 .nav-tabs .nav-link.active{ color:var(--orange); border-bottom:2px solid var(--orange); background:transparent; }
-
-/* Canh bao placeholder cong thuc/anh bi thieu du lieu (xem services/examImport/mathReference.js).
-   Khong duoc de nguoi dung nham la loi CSS/hong trang - phai noi bat va de hieu. */
-.math-ref-missing{
-  display:inline-block; background:#fff3cd; color:#7a5b00; border:1px dashed #e0a800;
-  border-radius:4px; padding:1px 6px; font-size:.85em; font-weight:600; cursor:help;
-}

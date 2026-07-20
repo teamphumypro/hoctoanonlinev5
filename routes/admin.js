@@ -11,7 +11,7 @@ const miscController = require('../controllers/adminMiscController');
 const checkoutController = require('../controllers/checkoutController');
 const siteSettingsController = require('../controllers/adminSiteSettingsController');
 const adminQuizController = require('../controllers/adminQuizController');
-const adminDocxExamController = require('../controllers/adminDocxExamController');
+const adminExamImportController = require('../controllers/adminExamImportController');
 const adminAiSettingsController = require('../controllers/adminAiSettingsController');
 const adminBookController = require('../controllers/adminBookController');
 const adminOnlineBookController = require('../controllers/adminOnlineBookController');
@@ -168,8 +168,8 @@ router.get('/bai-kiem-tra/:quizId/giao-de', requireRole('teacher'), adminQuizCon
 router.post('/bai-kiem-tra/:quizId/giao-de', requireRole('teacher'), adminQuizController.assignSubmit);
 router.post('/bai-kiem-tra/:quizId/giao-de/:userId/huy', requireRole('teacher'), adminQuizController.unassign);
 
-// ---- Upload de thi truc tiep tu file Word (.docx) - huong Azota: tai tao lai noi dung + cong thuc ----
-router.get('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), adminDocxExamController.uploadForm);
+// ---- Upload de thi tu file Word/PDF hoac link Google Drive (tu dong nhan dien + xem truoc de sua) ----
+router.get('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), adminExamImportController.uploadForm);
 router.post('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), (req, res, next) => {
   uploadExamDoc.single('exam_file')(req, res, (err) => {
     if (err) {
@@ -180,8 +180,8 @@ router.post('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), (req, res, n
     }
     next();
   });
-}, adminDocxExamController.upload);
-router.post('/bai-kiem-tra/luu-de-import', requireRole('teacher'), adminDocxExamController.save);
+}, adminExamImportController.upload);
+router.post('/bai-kiem-tra/luu-de-import', requireRole('teacher'), adminExamImportController.save);
 
 // ---- 4. Hoc vien ----
 router.get('/hoc-vien', requireRole('ta'), userController.students);

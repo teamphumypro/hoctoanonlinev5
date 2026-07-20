@@ -1,18 +1,24 @@
 <% var pageTitle = 'Bảng điểm: ' + quiz.title %>
 <%- include('../../partials/admin-header') %>
+<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <% if (pending.length > 0) { %>
 <div class="card p-3 mb-3 border-warning">
   <h6 class="fw-bold mb-2">✍️ Cần chấm tay (<%= pending.length %> bài)</h6>
   <% pending.forEach(p => { %>
     <div class="border rounded p-2 mb-2">
-      <div class="small text-muted">Học viên: <strong><%= p.user_name %></strong> — Câu hỏi: <%- p.question %> (tối đa <%= p.max_points %>đ)</div>
-      <div class="p-2 bg-light rounded my-2"><%- p.answer_text %></div>
-      <form method="POST" action="/admin/bai-kiem-tra/cham-tay" class="d-flex gap-2 align-items-center">
+      <div class="small text-muted">Học viên: <strong><%= p.user_name %></strong> — Câu hỏi: <%= p.question %> (tối đa <%= p.max_points %>đ)</div>
+      <div class="essay-answer-render my-2" id="answerRender<%= p.id %>"></div>
+      <script type="application/json" id="answerJson<%= p.id %>"><%- JSON.stringify(p.answer_text || '').replace(/</g, '\\u003c') %></script>
+      <% var rubric = Array.isArray(p.rubric_json) ? p.rubric_json : []; %>
+      <form method="POST" action="/admin/bai-kiem-tra/cham-tay" class="manual-grade-form border-top pt-2">
         <input type="hidden" name="answer_id" value="<%= p.id %>">
         <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
-        <input type="number" step="0.05" min="0" max="<%= p.max_points %>" name="points" class="form-control form-control-sm" style="width:100px" placeholder="Điểm" required>
-        <button class="btn btn-sm btn-primary">Lưu điểm</button>
+        <input type="hidden" name="rubric_scores" class="rubric-scores" value="{}">
+        <% if (rubric.length) { %><div class="mb-2"><strong class="small">Chấm theo từng ý:</strong>
+          <% rubric.forEach((r,ri)=>{ %><label class="d-flex align-items-center gap-2 py-1 border-bottom rubric-check-row"><input type="checkbox" class="rubric-check" data-id="<%= r.id||('r'+(ri+1)) %>" data-score="<%= Number(r.score||0) %>"><span class="flex-grow-1"><%= r.title %></span><strong>+<%= Number(r.score||0) %>đ</strong></label><% }) %>
+        </div><% } %>
+        <div class="d-flex gap-2 align-items-center"><input type="number" step="0.05" min="0" max="<%= p.max_points %>" name="points" class="form-control form-control-sm manual-points" style="width:100px" placeholder="Điểm" required><button class="btn btn-sm btn-primary">Lưu điểm</button></div>
       </form>
     </div>
   <% }) %>
@@ -67,4 +73,18 @@
   </table>
 </div>
 
+<script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']] } };</script>
+<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="/js/math-essay-editor.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.manual-grade-form').forEach(function(form){ const checks=[...form.querySelectorAll('.rubric-check')], points=form.querySelector('.manual-points'), hidden=form.querySelector('.rubric-scores'); function sync(){const scores={};let total=0;checks.forEach(c=>{scores[c.dataset.id]=c.checked?Number(c.dataset.score):0;if(c.checked)total+=Number(c.dataset.score)});hidden.value=JSON.stringify(scores);if(checks.length)points.value=total.toFixed(2).replace(/\.00$/,'');} checks.forEach(c=>c.addEventListener('change',sync)); });
+  document.querySelectorAll('.essay-answer-render').forEach(function (el) {
+    const id = el.id.replace('answerRender','');
+    const holder = document.getElementById('answerJson'+id);
+    let raw = ''; try { raw = JSON.parse(holder.textContent); } catch(e) { raw = holder.textContent; }
+    window.MathEssayEditor.renderAnswer(el, raw);
+  });
+});
+</script>
 <%- include('../../partials/admin-footer') %>

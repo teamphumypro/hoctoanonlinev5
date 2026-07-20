@@ -89,7 +89,9 @@ exports.results = async (req, res) => {
 // Cham diem 1 cau tu luan/tra loi ngan can cham tay
 exports.gradeManual = async (req, res) => {
   const { answer_id, points, quiz_id } = req.body;
-  await Quiz.gradeManualAnswer(answer_id, parseFloat(points) || 0, req.session.adminUser.id);
+  let rubricScores = {};
+  try { rubricScores = req.body.rubric_scores ? JSON.parse(req.body.rubric_scores) : {}; } catch (_) {}
+  await Quiz.gradeManualAnswer(answer_id, parseFloat(points) || 0, req.session.adminUser.id, rubricScores);
   res.redirect(`/admin/bai-kiem-tra/${quiz_id}/ket-qua`);
 };
 

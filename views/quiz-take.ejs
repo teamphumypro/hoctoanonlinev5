@@ -1,5 +1,6 @@
 <% var pageTitle = quiz.title %>
 <%- include('partials/header') %>
+<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <div class="row justify-content-center">
   <div class="col-lg-8">
@@ -65,116 +66,18 @@
                 <input name="answers[<%= q.id %>]" class="form-control" style="max-width:300px" placeholder="Nhập đáp án">
 
               <% } else if (q.type === 'essay') { %>
-                <div class="essay-editor-wrap" data-qid="<%= q.id %>">
-                  <div class="d-flex gap-2 flex-wrap mb-1">
-                    <button type="button" class="btn btn-sm btn-outline-secondary essay-btn-frac">Phân số</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary essay-btn-sqrt">√</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary essay-btn-pow">x²</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary essay-btn-draw"><i class="fa-solid fa-pen"></i> Viết tay</button>
-                  </div>
-                  <div class="essay-area form-control" contenteditable="true" style="min-height:160px; line-height:1.8;" data-placeholder="Viết bài làm của bạn tại đây..."></div>
-                  <input type="hidden" name="essay[<%= q.id %>]" class="essay-hidden-input">
-                  <div class="essay-draw-overlay border rounded p-2 mt-2" style="display:none; background:#fafafa;">
-                    <canvas class="essay-draw-canvas" width="600" height="160" style="width:100%; height:160px; background:#fff; border:1px solid #ddd; border-radius:4px; cursor:crosshair; touch-action:none;"></canvas>
-                    <div class="d-flex gap-2 mt-2">
-                      <button type="button" class="btn btn-sm btn-outline-secondary essay-draw-clear">Xóa nét</button>
-                      <button type="button" class="btn btn-sm btn-primary essay-draw-insert">Chèn vào bài làm</button>
-                      <button type="button" class="btn btn-sm btn-outline-secondary essay-draw-cancel">Hủy</button>
-                    </div>
-                  </div>
+                <div class="alert alert-light border small mb-2">
+                  <strong>Làm trực tiếp trên máy:</strong> bạn có thể kết hợp văn bản, công thức toán, viết/vẽ tay và ảnh bài làm trong cùng một câu.
                 </div>
+                <input type="hidden" name="essay[<%= q.id %>]" id="essayData<%= q.id %>" value="">
+                <div class="math-essay-editor" data-target="essayData<%= q.id %>" data-storage-key="quiz-<%= quiz.id %>-question-<%= q.id %>"></div>
               <% } %>
             </div>
           <% }) %>
 
-          <button class="btn btn-primary">Nộp bài</button>
+          <button class="btn btn-primary" type="submit">Nộp bài</button>
         </form>
       <% } %>
-
-      <style>
-        .essay-area[contenteditable]:empty:before { content: attr(data-placeholder); color: var(--text-muted, #999); }
-        .essay-area .essay-frac { display:inline-flex; flex-direction:column; align-items:center; vertical-align:middle; margin:0 4px; font-size:13px; }
-        .essay-area .essay-frac span { border-bottom:1px solid #333; padding:0 4px; outline:none; min-width:20px; text-align:center; }
-        .essay-area .essay-frac span:last-child { border-bottom:none; }
-        .essay-area .essay-sqrt span { border-top:1px solid #333; padding:0 2px; outline:none; }
-      </style>
-      <script>
-        function essayInsertAtCursor(area, node) {
-          area.focus();
-          const sel = window.getSelection();
-          let range;
-          if (sel.rangeCount && area.contains(sel.anchorNode)) range = sel.getRangeAt(0);
-          else { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
-          range.insertNode(node);
-          range.setStartAfter(node);
-          range.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-
-        document.querySelectorAll('.essay-editor-wrap').forEach(wrap => {
-          const area = wrap.querySelector('.essay-area');
-          const hidden = wrap.querySelector('.essay-hidden-input');
-
-          wrap.querySelector('.essay-btn-frac').addEventListener('click', () => {
-            const el = document.createElement('span');
-            el.contentEditable = 'false'; el.className = 'essay-frac';
-            el.innerHTML = '<span contenteditable="true">a</span><span contenteditable="true">b</span>';
-            essayInsertAtCursor(area, el);
-            essayInsertAtCursor(area, document.createTextNode('\u00A0'));
-          });
-          wrap.querySelector('.essay-btn-sqrt').addEventListener('click', () => {
-            const el = document.createElement('span');
-            el.contentEditable = 'false'; el.className = 'essay-sqrt';
-            el.innerHTML = '&radic;<span contenteditable="true">x</span>';
-            essayInsertAtCursor(area, el);
-            essayInsertAtCursor(area, document.createTextNode('\u00A0'));
-          });
-          wrap.querySelector('.essay-btn-pow').addEventListener('click', () => {
-            const el = document.createElement('span');
-            el.contentEditable = 'false';
-            el.innerHTML = 'x<sup contenteditable="true">2</sup>';
-            essayInsertAtCursor(area, el);
-            essayInsertAtCursor(area, document.createTextNode('\u00A0'));
-          });
-
-          const overlay = wrap.querySelector('.essay-draw-overlay');
-          const canvas = wrap.querySelector('.essay-draw-canvas');
-          const ctx = canvas.getContext('2d');
-          let drawing = false;
-          function pos(e) {
-            const r = canvas.getBoundingClientRect();
-            const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-            const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
-            return { x: cx * canvas.width / r.width, y: cy * canvas.height / r.height };
-          }
-          canvas.addEventListener('pointerdown', e => { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
-          canvas.addEventListener('pointermove', e => { if (!drawing) return; const p = pos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222'; ctx.lineTo(p.x, p.y); ctx.stroke(); });
-          window.addEventListener('pointerup', () => drawing = false);
-
-          wrap.querySelector('.essay-btn-draw').addEventListener('click', () => { overlay.style.display = 'block'; });
-          wrap.querySelector('.essay-draw-cancel').addEventListener('click', () => { overlay.style.display = 'none'; });
-          wrap.querySelector('.essay-draw-clear').addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
-          wrap.querySelector('.essay-draw-insert').addEventListener('click', () => {
-            const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/png');
-            img.style.cssText = 'display:block; max-width:280px; margin:6px 0; border:1px solid #ddd; border-radius:4px;';
-            essayInsertAtCursor(area, img);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            overlay.style.display = 'none';
-          });
-        });
-
-        // Truoc khi nop bai: chuyen noi dung dang go (HTML trong contenteditable) vao o an de gui len server
-        const quizFormEl = document.querySelector('form[action*="/nop-bai"]');
-        if (quizFormEl) {
-          quizFormEl.addEventListener('submit', () => {
-            document.querySelectorAll('.essay-editor-wrap').forEach(wrap => {
-              wrap.querySelector('.essay-hidden-input').value = wrap.querySelector('.essay-area').innerHTML;
-            });
-          });
-        }
-      </script>
     </div>
   </div>
 </div>
@@ -194,6 +97,7 @@
       display.textContent = '00:00';
       if (!autoSubmitted && form) {
         autoSubmitted = true;
+        window.MathEssayEditor?.syncAll();
         alert('Đã hết thời gian làm bài, hệ thống sẽ tự động nộp bài.');
         form.submit();
       }
@@ -208,6 +112,8 @@
 </script>
 <% } %>
 
-<script>window.MathJax = { tex: { inlineMath: [['$','$']] } };</script>
+<script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']] } };</script>
+<script src="/js/math-essay-editor.js"></script>
+<script>document.getElementById('quizForm')?.addEventListener('submit',()=>window.MathEssayEditor?.syncAll());</script>
 <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
 <%- include('partials/footer') %>

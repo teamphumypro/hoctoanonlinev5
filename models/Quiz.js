@@ -1,9 +1,4 @@
 const db = require('../config/db');
-// Lop bao ve cuoi cung, chay TRUOC MOI luot ghi cau hoi vao CSDL, bat ke du lieu den tu
-// bo tach de tu dong, tu AI, hay tu giao vien go/sua tay o form duyet de - dam bao khong
-// bao gio luu (va sau do hien thi cho hoc sinh) mot placeholder tham chieu cong thuc/anh
-// (vd dang Azota "[!m:$mathtype_2$]") o dang tho, chua duoc xu ly.
-const { sanitizeQuestionPayload } = require('../services/examImport/mathReference');
 
 const Quiz = {
   async findByLesson(lesson_id) {
@@ -172,16 +167,10 @@ const Quiz = {
   },
 
   // ---- Them cau hoi theo tung dang ----
-  // page_number/solution_page la tuy chon (null neu khong phai de dang PDF sach lat) - trang PDF
-  // cau hoi nay xuat hien / trang chua loi giai chi tiet, dung de dong bo voi flipbook.
-  async addSingleChoiceQuestion(input) {
-    const { row: { question, points, options, correctIndex, position, explanation } } = sanitizeQuestionPayload(input);
-    const quiz_id = input.quiz_id;
-    const page_number = input.page_number || null;
-    const solution_page = input.solution_page || null;
+  async addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex, position, explanation, ast_json, rubric }) {
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'single_choice',$3,$4,$5,$6,$7) RETURNING *`,
-      [quiz_id, question, points || 0.25, position || 0, explanation || null, page_number, solution_page]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, ast_json, rubric_json) VALUES ($1,$2,'single_choice',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 0.25, position || 0, explanation || null, ast_json ? JSON.stringify(ast_json) : null, JSON.stringify(rubric || [])]
     );
     for (let i = 0; i < options.length; i++) {
       if (!options[i] || !options[i].trim()) continue;
@@ -192,15 +181,11 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addTrueFalseQuestion(input) {
+  async addTrueFalseQuestion({ quiz_id, question, points, items, position, explanation, ast_json, rubric }) {
     // items: [{ content, is_correct }, ...] toi da 4 y (a,b,c,d)
-    const { row: { question, points, items, position, explanation } } = sanitizeQuestionPayload(input);
-    const quiz_id = input.quiz_id;
-    const page_number = input.page_number || null;
-    const solution_page = input.solution_page || null;
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'true_false',$3,$4,$5,$6,$7) RETURNING *`,
-      [quiz_id, question, points || 1, position || 0, explanation || null, page_number, solution_page]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, ast_json, rubric_json) VALUES ($1,$2,'true_false',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 1, position || 0, explanation || null, ast_json ? JSON.stringify(ast_json) : null, JSON.stringify(rubric || [])]
     );
     for (const item of items) {
       if (!item.content || !item.content.trim()) continue;
@@ -211,31 +196,19 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addShortAnswerQuestion(input) {
-    const { row: { question, points, correct_answer, position, explanation } } = sanitizeQuestionPayload(input);
-    const quiz_id = input.quiz_id;
-    const page_number = input.page_number || null;
-    const solution_page = input.solution_page || null;
+  async addShortAnswerQuestion({ quiz_id, question, points, correct_answer, position, explanation, ast_json, rubric }) {
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position, explanation, page_number, solution_page) VALUES ($1,$2,'short_answer',$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [quiz_id, question, points || 0.25, correct_answer, position || 0, explanation || null, page_number, solution_page]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position, explanation, ast_json, rubric_json) VALUES ($1,$2,'short_answer',$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [quiz_id, question, points || 0.25, correct_answer, position || 0, explanation || null, ast_json ? JSON.stringify(ast_json) : null, JSON.stringify(rubric || [])]
     );
     return r.rows[0];
   },
-  async addEssayQuestion(input) {
-    const { row: { question, points, position, explanation } } = sanitizeQuestionPayload(input);
-    const quiz_id = input.quiz_id;
-    const page_number = input.page_number || null;
-    const solution_page = input.solution_page || null;
+  async addEssayQuestion({ quiz_id, question, points, position, explanation, ast_json, rubric }) {
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'essay',$3,$4,$5,$6,$7) RETURNING *`,
-      [quiz_id, question, points || 2, position || 0, explanation || null, page_number, solution_page]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, ast_json, rubric_json) VALUES ($1,$2,'essay',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 2, position || 0, explanation || null, ast_json ? JSON.stringify(ast_json) : null, JSON.stringify(rubric || [])]
     );
     return r.rows[0];
-  },
-  // Gan file PDF nguon (sach lat) cho 1 de thi - dung khi import theo cach moi
-  async setPdfSource(quiz_id, pdfPath, totalPages) {
-    await db.query('UPDATE quizzes SET pdf_source_path=$1, pdf_total_pages=$2 WHERE id=$3', [pdfPath, totalPages, quiz_id]);
   },
   async deleteQuestion(id) {
     await db.query('DELETE FROM quiz_questions WHERE id=$1', [id]);
@@ -256,7 +229,7 @@ const Quiz = {
     for (const q of questions) {
       const val = answers[q.id];
       let earned = 0;
-      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points), explanation: q.explanation || null, solutionPage: q.solution_page || null };
+      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points), explanation: q.explanation || null };
 
       if (q.type === 'single_choice') {
         const correctOption = q.options.find(o => o.is_correct);
@@ -352,7 +325,7 @@ const Quiz = {
   // ---- Cham tay cac cau tu luan (Ngu Van...) ----
   async pendingManualGrading(quiz_id) {
     const r = await db.query(`
-      SELECT aa.*, qa.user_id, u.name AS user_name, qq.question, qq.points AS max_points
+      SELECT aa.*, qa.user_id, u.name AS user_name, qq.question, qq.points AS max_points, qq.rubric_json
       FROM quiz_attempt_answers aa
       JOIN quiz_attempts qa ON qa.id = aa.attempt_id
       JOIN quiz_questions qq ON qq.id = aa.question_id
@@ -361,13 +334,13 @@ const Quiz = {
       ORDER BY qa.attempted_at`, [quiz_id]);
     return r.rows;
   },
-  async gradeManualAnswer(answerId, points, graderId) {
+  async gradeManualAnswer(answerId, points, graderId, rubricScores = {}) {
     const ansR = await db.query('SELECT * FROM quiz_attempt_answers WHERE id=$1', [answerId]);
     const ans = ansR.rows[0];
     if (!ans) return;
     await db.query(
-      `UPDATE quiz_attempt_answers SET awarded_points=$1, needs_manual_grading=0, graded_by=$2, graded_at=now() WHERE id=$3`,
-      [points, graderId, answerId]
+      `UPDATE quiz_attempt_answers SET awarded_points=$1, needs_manual_grading=0, graded_by=$2, graded_at=now(), rubric_scores=$4 WHERE id=$3`,
+      [points, graderId, answerId, JSON.stringify(rubricScores || {})]
     );
     // Cong diem vua cham vao tong diem cua luot lam bai, va kiem tra lai da du dieu kien dat chua
     const attemptR = await db.query('SELECT * FROM quiz_attempts WHERE id=$1', [ans.attempt_id]);

@@ -513,13 +513,7 @@ CREATE TABLE IF NOT EXISTS online_book_categories (
 );
 ALTER TABLE online_books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES online_book_categories(id) ON DELETE SET NULL;
 
--- ---------- BO SUNG: "Thuc chien phong thi" kieu PDF sach lat (thay the hoan toan cach import
--- doc-hieu-tach-noi-dung cu). De thi hien thi bang chinh trang PDF goc qua pdf.js o trinh duyet -
--- khong con luu lai noi dung/cong thuc duoi dang van ban tai tao, chi luu metadata nhe (trang nao
--- ung voi cau nao, dap an dung la gi) de cham diem, giong het co che dang dung cho quiz_questions. ----------
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_source_path TEXT;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_total_pages INTEGER;
-ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS page_number INTEGER;
--- Trang chua loi giai chi tiet cua cau nay trong CHINH FILE PDF GOC (khong chep lai noi dung/cong
--- thuc ra van ban - xem PDF-FLIPBOOK-KIEN-TRUC-MOI.md). NULL neu de khong co phan loi giai rieng.
-ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS solution_page INTEGER;
+-- V5 AST + rubric grading
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS ast_json JSONB;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS rubric_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE quiz_attempt_answers ADD COLUMN IF NOT EXISTS rubric_scores JSONB NOT NULL DEFAULT '{}'::jsonb;

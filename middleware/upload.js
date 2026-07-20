@@ -22,13 +22,11 @@ const uploadAvatar = multer({ storage: makeStorage('avatars'), limits: { fileSiz
 const uploadThumbnail = multer({ storage: makeStorage('thumbnails'), limits: { fileSize: 5 * 1024 * 1024 } });
 const uploadVideo = multer({ storage: makeStorage('videos'), limits: { fileSize: 500 * 1024 * 1024 } });
 const uploadFile = multer({ storage: makeStorage('files'), limits: { fileSize: 50 * 1024 * 1024 } });
-// File Word de thi - doc truc tiep noi dung + cong thuc (huong Azota, xem services/examImport/
-// docxRichExtractor.js va examAssembler.js - da kiem chung tren file de thi that).
 const uploadExamDoc = multer({
   storage: makeStorage('exam-imports'),
-  limits: { fileSize: 60 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = /\.docx$/i.test(file.originalname);
+    const ok = /\.(docx|pdf|doc|xlsx|xls)$/i.test(file.originalname);
     cb(null, ok);
   }
 });
