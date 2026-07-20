@@ -25,25 +25,6 @@ exports.take = async (req, res) => {
   let quizStart = null;
   if (quiz.time_limit_minutes) quizStart = await Quiz.getOrCreateStart(quiz.id, req.session.user.id);
 
-  // De dang PDF sach lat (import theo cach moi): hien flipbook + bang tra loi dong bo theo trang,
-  // thay vi render toan bo noi dung cau server-side nhu truoc.
-  if (quiz.pdf_source_path) {
-    // QUAN TRONG: JSON nay se duoc nhung thang vao trang (client can de dung bang tra loi dong theo
-    // trang) - PHAI loc bo moi truong chua dap an dung truoc khi gui, neu khong hoc sinh co the xem
-    // View Source la thay dap an. Khac voi view cu (render server-side, khong bao gio lo).
-    const clientQuestions = questions.map((q, qi) => ({
-      id: q.id,
-      displayNumber: qi + 1,
-      type: q.type,
-      points: q.points,
-      page_number: q.page_number,
-      optionCount: q.type === 'single_choice' ? (q.options || []).length : (q.type === 'true_false' ? (q.tfItems || []).length : 0),
-      options: q.type === 'single_choice' ? (q.options || []).map(o => ({ id: o.id })) : undefined,
-      tfItems: q.type === 'true_false' ? (q.tfItems || []).map(it => ({ id: it.id })) : undefined
-    }));
-    return res.render('quiz-take-pdf', { quiz, questions: clientQuestions, bestAttempt, totalPoints: Quiz.totalPoints(questions), quizStart });
-  }
-
   res.render('quiz-take', { quiz, questions, bestAttempt, totalPoints: Quiz.totalPoints(questions), quizStart });
 };
 

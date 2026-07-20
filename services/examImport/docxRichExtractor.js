@@ -2,7 +2,6 @@
 // de ghep dung vi tri cong thuc/anh vao giua cau chu, thay vi de mammoth bo qua cong thuc.
 // Neu buoc nao that bai, nem loi ra ngoai de ham goi dung phuong an du phong (mammoth text thuong).
 const fs = require('fs');
-const path = require('path');
 
 async function extractDocxRich(filePath) {
   const JSZip = require('jszip');
@@ -166,29 +165,67 @@ async function extractDocxRich(filePath) {
   return { text, images };
 }
 
-// Kiem tra 1 lan xem server co LibreOffice (soffice) hay khong, cache lai de khong phai kiem tra
-// lai moi lan co cong thuc WMF/EMF can chuyen doi (moi lan spawn process con khong can thiet).
-let _sofficeAvailable = null;
-async function checkSofficeAvailable() {
-  if (_sofficeAvailable !== null) return _sofficeAvailable;
-  const { execFile } = require('child_process');
-  _sofficeAvailable = await new Promise((resolve) => {
-    const child = execFile('soffice', ['--version'], { timeout: 8000 }, (err) => resolve(!err));
-    child.on('error', () => resolve(false));
-  });
-  return _sofficeAvailable;
-}
+// Chuyen doi hang loat cac anh cong thuc dang WMF/EMF sang PNG.
+// UU TIEN dung thu vien JS thuan (emf-converter + @napi-rs/canvas) — khong can cai LibreOffice/Docker
+// tren server, cai dat nhanh vi da co san file bien dich (khong bien dich luc npm install).
+// Neu vi ly do gi buoc nay loi (file WMF qua la/hiem gap), tu dong thu qua LibreOffice (soffice)
+// NEU server co cai (vd dang chay Docker) — neu khong co ca 2, tra ve rong, khong lam vo ca file.
+async function convertAllWmfImages(zip, relMap) {
+  const path = require('path');
 
-async function convertViaLibreOffice(zip, targets) {
+  const wmfTargets = Object.values(relMap)
+    .filter(t => /\.(wmf|emf)$/i.test(t))
+    .map(t => t.startsWith('media/') ? 'word/' + t : 'word/media/' + t.split('/').pop());
+  const uniqueTargets = [...new Set(wmfTargets)];
+  if (uniqueTargets.length === 0) return {};
+
+  const result = {};
+  const stillNeeded = [];
+
+  // ---- Cach 1 (uu tien): JS thuan, khong can phan mem ngoai ----
+  try {
+    const { convertWmfToDataUrl, convertEmfToDataUrl } = require('emf-converter');
+    const canvasModule = require('@napi-rs/canvas');
+    // emf-converter can co OffscreenCanvas/HTMLCanvasElement ton tai san trong moi truong chay —
+    // gia lap bang @napi-rs/canvas (khong co san trong Node binh thuong)
+    if (typeof globalThis.OffscreenCanvas === 'undefined') {
+      globalThis.OffscreenCanvas = canvasModule.Canvas;
+    }
+
+    for (const target of uniqueTargets) {
+      const f = zip.file(target);
+      if (!f) continue;
+      try {
+        const buf = await f.async('arraybuffer');
+        const isEmf = /\.emf$/i.test(target);
+        const dataUrl = isEmf ? await convertEmfToDataUrl(buf) : await convertWmfToDataUrl(buf);
+        if (dataUrl) {
+          const base64 = dataUrl.split(',')[1];
+          result[target] = base64;
+        } else {
+          stillNeeded.push(target);
+        }
+      } catch (innerErr) {
+        console.error(`Khong chuyen doi duoc ${target} bang JS thuan:`, innerErr.message);
+        stillNeeded.push(target);
+      }
+    }
+  } catch (err) {
+    console.error('Khong tai duoc thu vien chuyen doi WMF thuan JS (emf-converter/@napi-rs/canvas):', err.message);
+    stillNeeded.push(...uniqueTargets);
+  }
+
+  if (stillNeeded.length === 0) return result;
+
+  // ---- Cach 2 (du phong): LibreOffice, chi chay neu server co cai (vd dang dung Docker) ----
   const os = require('os');
   const fs = require('fs');
   const { execFile } = require('child_process');
-  const result = {};
   let tmpDir;
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmfconv-'));
     const writtenPaths = [];
-    for (const target of targets) {
+    for (const target of stillNeeded) {
       const f = zip.file(target);
       if (!f) continue;
       const buf = await f.async('nodebuffer');
@@ -208,104 +245,11 @@ async function convertViaLibreOffice(zip, targets) {
       }
     }
   } catch (err) {
-    console.error('Loi khi chuyen doi WMF/EMF bang LibreOffice:', err.message);
+    console.error('Khong co LibreOffice de du phong (binh thuong neu server khong dung Docker):', err.message);
   } finally {
     if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {} }
   }
-  return result;
-}
 
-async function convertViaJsLibrary(zip, targets) {
-  const result = {};
-  const stillNeeded = [];
-  try {
-    // emf-converter duoc viet cho trinh duyet va dung FileReader de doi Blob thanh data URL.
-    // Node 20 co Blob nhung khong co FileReader, vi vay can polyfill nho nay truoc khi require.
-    if (typeof globalThis.FileReader === 'undefined') {
-      globalThis.FileReader = class NodeFileReader {
-        constructor() { this.result = null; this.error = null; this.onload = null; this.onerror = null; }
-        async readAsDataURL(blob) {
-          try {
-            const ab = await blob.arrayBuffer();
-            const mime = blob.type || 'application/octet-stream';
-            this.result = `data:${mime};base64,${Buffer.from(ab).toString('base64')}`;
-            if (typeof this.onload === 'function') this.onload({ target: this });
-          } catch (err) {
-            this.error = err;
-            if (typeof this.onerror === 'function') this.onerror({ target: this });
-          }
-        }
-      };
-    }
-    const { convertWmfToDataUrl, convertEmfToDataUrl } = require('emf-converter');
-    const canvasModule = require('@napi-rs/canvas');
-    if (typeof globalThis.OffscreenCanvas === 'undefined') {
-      globalThis.OffscreenCanvas = canvasModule.Canvas;
-    }
-
-    for (const target of targets) {
-      const f = zip.file(target);
-      if (!f) continue;
-      try {
-        const buf = await f.async('arraybuffer');
-        const isEmf = /\.emf$/i.test(target);
-        const dataUrl = isEmf ? await convertEmfToDataUrl(buf) : await convertWmfToDataUrl(buf);
-        if (dataUrl) {
-          result[target] = dataUrl.split(',')[1];
-        } else {
-          stillNeeded.push(target);
-        }
-      } catch (innerErr) {
-        console.error(`Khong chuyen doi duoc ${target} bang JS thuan:`, innerErr.message);
-        stillNeeded.push(target);
-      }
-    }
-  } catch (err) {
-    console.error('Khong tai duoc thu vien chuyen doi WMF thuan JS (emf-converter/@napi-rs/canvas):', err.message);
-    stillNeeded.push(...targets);
-  }
-  return { result, stillNeeded };
-}
-
-// Chuyen doi hang loat cac anh cong thuc dang WMF/EMF sang PNG.
-//
-// QUAN TRONG - bai hoc rut ra tu loi thuc te (cong thuc hien thi thanh net ve rac, khong con
-// chu so/ky hieu): thu vien JS thuan "emf-converter" la 1 bo doc WMF/EMF NHE, chi ve lai duoc
-// cac lenh do hoa vector co ban (duong thang, da giac...) - no KHONG doc day du record van ban/
-// glyph (ExtTextOut) ma MathType nhung vao file WMF de ve chu so/ky hieu. Hau qua: no khong loi
-// (van tra ve 1 anh PNG "hop le" ve mat ky thuat) nhung ANH SAI - chi con vai net cong vo nghia,
-// mat het noi dung cong thuc that. Vi no "thanh cong" (co tra ve du lieu), code truoc day khong
-// bao gio roi xuong phuong an du phong LibreOffice.
-//
-// LibreOffice (soffice) doc dung chuan WMF/EMF day du (ca record van ban/font) vi no dung chinh
-// engine tuong thich Microsoft Office - dang tin cay hon nhieu cho cong thuc MathType. Vi Dockerfile
-// cua du an da cai san LibreOffice, uu tien dung no TRUOC neu server co; JS thuan chi con la phuong
-// an du phong cho moi truong khong co LibreOffice (vd deploy Render khong dung Dockerfile).
-async function convertAllWmfImages(zip, relMap) {
-  const wmfTargets = Object.values(relMap)
-    .filter(t => /\.(wmf|emf)$/i.test(t))
-    .map(t => t.startsWith('media/') ? 'word/' + t : 'word/media/' + t.split('/').pop());
-  const uniqueTargets = [...new Set(wmfTargets)];
-  if (uniqueTargets.length === 0) return {};
-
-  const hasLibreOffice = await checkSofficeAvailable();
-
-  if (hasLibreOffice) {
-    const result = await convertViaLibreOffice(zip, uniqueTargets);
-    const missing = uniqueTargets.filter(t => !result[t]);
-    if (missing.length > 0) {
-      // LibreOffice khong xu ly duoc 1 vai file (hiem) - thu JS thuan cho phan con thieu, con hon
-      // khong co gi.
-      const { result: jsResult } = await convertViaJsLibrary(zip, missing);
-      Object.assign(result, jsResult);
-    }
-    return result;
-  }
-
-  // Khong co LibreOffice tren server nay (vd deploy Render khong dung Dockerfile) -> dung JS thuan.
-  // Luu y: chat luong co the kem hon (xem ghi chu o tren) - day la phuong an du phong, khong phai
-  // ly tuong. Neu can chat luong cao, nen deploy bang Dockerfile co san trong repo.
-  const { result } = await convertViaJsLibrary(zip, uniqueTargets);
   return result;
 }
 

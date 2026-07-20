@@ -7,7 +7,7 @@
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "test": "node tests/mathReference.test.js && node tests/pdfImageExtractor.test.js && node tests/pdfAutoDetect.test.js && node tests/pdfAutoDetectSolution.test.js"
+    "test": "node tests/examImport.test.js"
   },
   "dependencies": {
     "pg": "^8.11.5",
