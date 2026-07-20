@@ -11,6 +11,7 @@ const miscController = require('../controllers/adminMiscController');
 const checkoutController = require('../controllers/checkoutController');
 const siteSettingsController = require('../controllers/adminSiteSettingsController');
 const adminQuizController = require('../controllers/adminQuizController');
+const quizController = require('../controllers/quizController');
 const adminExamImportController = require('../controllers/adminExamImportController');
 const adminAiSettingsController = require('../controllers/adminAiSettingsController');
 const adminBookController = require('../controllers/adminBookController');
@@ -169,6 +170,7 @@ router.post('/bai-kiem-tra/:quizId/giao-de', requireRole('teacher'), adminQuizCo
 router.post('/bai-kiem-tra/:quizId/giao-de/:userId/huy', requireRole('teacher'), adminQuizController.unassign);
 
 // ---- Upload de thi tu file Word/PDF hoac link Google Drive (tu dong nhan dien + xem truoc de sua) ----
+router.get('/bai-kiem-tra/:id/de.pdf', requireRole('teacher'), quizController.pdfDocument);
 router.get('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), adminExamImportController.uploadForm);
 router.post('/bai-kiem-tra/:quizId/tai-de', requireRole('teacher'), (req, res, next) => {
   uploadExamDoc.single('exam_file')(req, res, (err) => {

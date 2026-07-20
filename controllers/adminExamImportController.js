@@ -1,106 +1,62 @@
 const fs = require('fs');
+const path = require('path');
 const Quiz = require('../models/Quiz');
-const Settings = require('../models/Settings');
-const { extractText, downloadFromDriveLink } = require('../services/examImport/extractText');
-const { parseExamText } = require('../services/examImport/regexParser');
-const { parseWithAI } = require('../services/ai/examAiParser');
+const { parsePdfExam } = require('../services/examImport/pdfExamParser');
 
-// Dung chung cho ca 2 truong hop: de gan voi 1 bai hoc (co lesson) hoac de doc lap trong Thuc chien phong thi
 exports.uploadForm = async (req, res) => {
   const quiz = await Quiz.findById(req.params.quizId);
   if (!quiz) return res.redirect('/admin');
-  const config = await Settings.getAll();
-  res.render('admin/quizzes/import-upload', { quiz, aiConfigured: !!(config.ai_api_key && config.ai_api_key.trim()), error: null });
+  res.render('admin/quizzes/import-upload', { quiz, error: null });
 };
 
 exports.upload = async (req, res) => {
   const quiz = await Quiz.findById(req.params.quizId);
   if (!quiz) return res.redirect('/admin');
-  const config = await Settings.getAll();
+  if (!req.file) return res.render('admin/quizzes/import-upload', { quiz, error: 'Vui lòng chọn một file PDF.' });
 
-  let filePath = null;
+  const filePath = req.file.path;
   try {
-    if (req.file) {
-      filePath = req.file.path;
-    } else if (req.body.drive_link && req.body.drive_link.trim()) {
-      const uploadDir = require('path').join(__dirname, '..', 'public', 'uploads', 'exam-imports');
-      filePath = await downloadFromDriveLink(req.body.drive_link.trim(), uploadDir);
-    } else {
-      return res.render('admin/quizzes/import-upload', {
-        quiz, aiConfigured: !!(config.ai_api_key || '').trim(),
-        error: 'Vui lòng chọn file Word (.docx)/PDF hoặc dán link Google Drive.'
-      });
+    if (path.extname(req.file.originalname).toLowerCase() !== '.pdf') {
+      throw new Error('Phiên bản mới chỉ nhận file PDF để giữ nguyên 100% bố cục đề thi.');
     }
-
-    const { text: rawText, images } = await extractText(filePath);
-    fs.unlink(filePath, () => {}); // xoa file tam ngay sau khi doc xong, khong luu lai
-
-    if (!rawText || rawText.trim().length < 20) {
-      return res.render('admin/quizzes/import-upload', {
-        quiz, aiConfigured: !!(config.ai_api_key || '').trim(),
-        error: 'Không đọc được nội dung chữ nào từ file này. Có thể đây là file scan dạng ảnh, hoặc file bị lỗi.'
-      });
-    }
-
-    let questions = [];
-    let usedAI = false;
-    let aiError = null;
-    const wantAI = req.body.use_ai === 'on' && (config.ai_api_key || '').trim();
-
-    if (wantAI) {
-      try {
-        questions = await parseWithAI(rawText, config, images);
-        usedAI = true;
-      } catch (err) {
-        console.error('Loi AI parse de thi:', err.message);
-        aiError = err.message;
-        questions = parseExamText(rawText, images);
-      }
-    } else {
-      questions = parseExamText(rawText, images);
-    }
-
-    res.render('admin/quizzes/import-review', { quiz, questions, usedAI, aiError });
-  } catch (err) {
-    console.error('Loi doc file de thi:', err);
-    if (filePath) fs.unlink(filePath, () => {});
-    res.render('admin/quizzes/import-upload', {
-      quiz, aiConfigured: !!(config.ai_api_key || '').trim(),
-      error: 'Không đọc được file: ' + err.message
+    const parsed = await parsePdfExam(filePath);
+    const pdfBuffer = fs.readFileSync(filePath);
+    await Quiz.savePdfDocument(quiz.id, { pdfBuffer, filename: req.file.originalname });
+    fs.unlink(filePath, () => {});
+    res.render('admin/quizzes/pdf-import-review', {
+      quiz,
+      parsed,
+      originalName: req.file.originalname
     });
+  } catch (err) {
+    fs.unlink(filePath, () => {});
+    console.error('Lỗi xử lý đề PDF:', err);
+    res.render('admin/quizzes/import-upload', { quiz, error: 'Không xử lý được file PDF: ' + err.message });
   }
 };
 
-// Luu cac cau hoi da duoc xem/sua tren man hinh review vao database
 exports.save = async (req, res) => {
-  const { quiz_id, redirect_to } = req.body;
+  const quizId = Number(req.body.quiz_id);
   const rows = req.body.questions ? Object.values(req.body.questions) : [];
+  const questions = rows
+    .filter(r => r.include === 'on')
+    .map((r, index) => ({
+      displayNumber: String(r.display_number || index + 1),
+      page: Math.max(1, Number(r.page) || 1),
+      type: r.type || 'single_choice',
+      points: Number(r.points) || 0.25,
+      optionCount: Number(r.option_count) || (r.type === 'true_false' ? 4 : 4),
+      answer: String(r.answer || '').trim(),
+      sectionTitle: String(r.section_title || '')
+    }));
 
-  for (const row of rows) {
-    if (row.include !== 'on') continue;
-    const points = parseFloat(row.points) || 0.25;
-    const question = (row.question || '').trim();
-    if (!question) continue;
-    const explanation = (row.explanation || '').trim() || null;
-
-    if (row.type === 'single_choice') {
-      const options = row.options || [];
-      const correctIndex = parseInt(row.correct_index);
-      await Quiz.addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex: isNaN(correctIndex) ? 0 : correctIndex, explanation });
-
-    } else if (row.type === 'true_false') {
-      const contents = row.tf_content || [];
-      const corrects = row.tf_correct || [];
-      const items = contents.map((content, i) => ({ content, is_correct: corrects.includes(String(i)) }));
-      await Quiz.addTrueFalseQuestion({ quiz_id, question, points, items, explanation });
-
-    } else if (row.type === 'short_answer') {
-      await Quiz.addShortAnswerQuestion({ quiz_id, question, points, correct_answer: row.correct_answer || '', explanation });
-
-    } else if (row.type === 'essay') {
-      await Quiz.addEssayQuestion({ quiz_id, question, points, explanation });
-    }
-  }
-
-  res.redirect(redirect_to || `/admin/bai-kiem-tra/${quiz_id}/cau-hoi`);
+  const questionMap = questions.map((q, i) => ({ index: i, number: q.displayNumber, page: q.page, type: q.type }));
+  await Quiz.replaceWithPdfExam(quizId, {
+    pdfBuffer: null,
+    filename: req.body.original_name || `de-thi-${quizId}.pdf`,
+    pageCount: Number(req.body.page_count) || 1,
+    questionMap,
+    questions
+  });
+  res.redirect(`/admin/bai-kiem-tra/${quizId}/cau-hoi`);
 };

@@ -148,6 +148,62 @@ const Quiz = {
     return r.rows;
   },
 
+
+  async savePdfDocument(quiz_id, { pdfBuffer, filename }) {
+    await db.query(`INSERT INTO quiz_pdf_documents (quiz_id, filename, mime_type, pdf_data) VALUES ($1,$2,'application/pdf',$3) ON CONFLICT (quiz_id) DO UPDATE SET filename=EXCLUDED.filename, mime_type=EXCLUDED.mime_type, pdf_data=EXCLUDED.pdf_data, uploaded_at=now()`, [quiz_id, filename, pdfBuffer]);
+  },
+  async replaceWithPdfExam(quiz_id, { pdfBuffer, filename, pageCount, questionMap, questions }) {
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM quiz_questions WHERE quiz_id=$1', [quiz_id]);
+      if (pdfBuffer) {
+        await client.query(
+          `INSERT INTO quiz_pdf_documents (quiz_id, filename, mime_type, pdf_data) VALUES ($1,$2,'application/pdf',$3)
+           ON CONFLICT (quiz_id) DO UPDATE SET filename=EXCLUDED.filename, mime_type=EXCLUDED.mime_type, pdf_data=EXCLUDED.pdf_data, uploaded_at=now()`,
+          [quiz_id, filename || `de-thi-${quiz_id}.pdf`, pdfBuffer]
+        );
+      }
+      await client.query(
+        `UPDATE quizzes SET pdf_exam_mode=1, pdf_page_count=$2, pdf_question_map=$3::jsonb WHERE id=$1`,
+        [quiz_id, pageCount, JSON.stringify(questionMap || [])]
+      );
+      let position = 0;
+      for (const row of questions) {
+        position += 1;
+        const qText = `Câu ${row.displayNumber || position} — xem đề PDF trang ${row.page}`;
+        const qr = await client.query(
+          `INSERT INTO quiz_questions (quiz_id, question, type, points, position, correct_answer, source_page, display_number)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [quiz_id, qText, row.type, Number(row.points) || 0.25, position, row.type === 'short_answer' ? (row.answer || '') : null, Number(row.page) || 1, String(row.displayNumber || position)]
+        );
+        const questionId = qr.rows[0].id;
+        if (row.type === 'single_choice') {
+          const count = Math.max(2, Math.min(8, Number(row.optionCount) || 4));
+          const correct = String(row.answer || '').trim().toUpperCase();
+          for (let i=0;i<count;i++) {
+            const label = String.fromCharCode(65+i);
+            await client.query('INSERT INTO quiz_options (question_id, option_text, is_correct) VALUES ($1,$2,$3)', [questionId, label, label === correct ? 1 : 0]);
+          }
+        } else if (row.type === 'true_false') {
+          const answers = String(row.answer || '').split(',').map(v => v.trim());
+          const count = Math.max(2, Math.min(8, Number(row.optionCount) || answers.length || 4));
+          for (let i=0;i<count;i++) {
+            await client.query('INSERT INTO quiz_tf_items (question_id, content, is_correct, position) VALUES ($1,$2,$3,$4)', [questionId, `Ý ${String.fromCharCode(97+i)}`, answers[i] === 'true' ? 1 : 0, i]);
+          }
+        }
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally { client.release(); }
+  },
+  async getPdfDocument(quiz_id) {
+    const r = await db.query('SELECT filename, mime_type, pdf_data FROM quiz_pdf_documents WHERE quiz_id=$1', [quiz_id]);
+    return r.rows[0];
+  },
+
   // Lay toan bo cau hoi (kem dap an/y dung-sai) cua 1 bai kiem tra
   async fullQuestions(quiz_id) {
     const questions = (await db.query('SELECT * FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, id', [quiz_id])).rows;

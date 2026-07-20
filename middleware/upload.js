@@ -24,9 +24,9 @@ const uploadVideo = multer({ storage: makeStorage('videos'), limits: { fileSize:
 const uploadFile = multer({ storage: makeStorage('files'), limits: { fileSize: 50 * 1024 * 1024 } });
 const uploadExamDoc = multer({
   storage: makeStorage('exam-imports'),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const ok = /\.(docx|pdf|doc|xlsx|xls)$/i.test(file.originalname);
+    const ok = /\.pdf$/i.test(file.originalname);
     cb(null, ok);
   }
 });

@@ -1,0 +1,65 @@
+<%- include('../partials/header') %>
+<style>
+  .pdf-review-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(420px,.65fr);gap:16px;height:calc(100vh - 105px)}
+  .pdf-stage,.map-stage{background:#fff;border:1px solid #dde2ea;border-radius:12px;overflow:hidden}
+  .pdf-stage{display:flex;flex-direction:column}.pdf-toolbar{padding:10px 12px;border-bottom:1px solid #e8ebf0;display:flex;align-items:center;gap:8px}
+  #pdfCanvasWrap{flex:1;overflow:auto;background:#eef1f5;text-align:center;padding:16px}#pdfCanvas{max-width:100%;box-shadow:0 3px 18px #0002;background:#fff}
+  .map-stage{overflow:auto;padding:14px}.qrow{border:1px solid #e2e7ee;border-radius:10px;padding:10px;margin-bottom:10px;background:#fff}.qrow.active{border-color:#2f62d4;box-shadow:0 0 0 2px #2f62d422}
+  @media(max-width:900px){.pdf-review-grid{grid-template-columns:1fr;height:auto}.pdf-stage{height:70vh}.map-stage{max-height:none}}
+</style>
+<div class="container-fluid py-2">
+  <form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="savePdfExamForm">
+    <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
+    <input type="hidden" name="page_count" value="<%= parsed.pageCount %>">
+    <input type="hidden" name="original_name" value="<%= originalName %>">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div><h5 class="fw-bold mb-0">Kiểm tra phân trang và đáp án</h5><small class="text-muted">Đã tìm <%= parsed.questions.length %> câu trên <%= parsed.pageCount %> trang. Có thể sửa toàn bộ.</small></div>
+      <div><button type="button" class="btn btn-outline-primary btn-sm" id="addQuestion">+ Thêm câu</button> <button class="btn btn-success">Lưu đề PDF</button></div>
+    </div>
+    <div class="pdf-review-grid">
+      <section class="pdf-stage">
+        <div class="pdf-toolbar">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="prevPage">←</button>
+          <strong>Trang <span id="pageNum">1</span>/<%= parsed.pageCount %></strong>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="nextPage">→</button>
+          <span class="ms-auto small text-muted">Bấm một câu bên phải để mở đúng trang</span>
+        </div>
+        <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas></div>
+      </section>
+      <section class="map-stage">
+        <% if (parsed.warnings && parsed.warnings.length) { %><div class="alert alert-warning small"><%= parsed.warnings.join(' ') %></div><% } %>
+        <div id="questionRows">
+        <% parsed.questions.forEach((q,i)=>{ %>
+          <div class="qrow" data-page="<%= q.page %>">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <input class="form-check-input" type="checkbox" name="questions[<%= i %>][include]" checked>
+              <strong>Câu</strong><input class="form-control form-control-sm" style="width:70px" name="questions[<%= i %>][display_number]" value="<%= q.displayNumber %>">
+              <span class="ms-auto badge text-bg-light">Tự nhận diện</span>
+            </div>
+            <div class="row g-2">
+              <div class="col-3"><label class="small">Trang</label><input class="form-control form-control-sm page-input" type="number" min="1" max="<%= parsed.pageCount %>" name="questions[<%= i %>][page]" value="<%= q.page %>"></div>
+              <div class="col-6"><label class="small">Dạng câu</label><select class="form-select form-select-sm type-select" name="questions[<%= i %>][type]"><option value="single_choice" <%= q.type==='single_choice'?'selected':'' %>>Trắc nghiệm</option><option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Đúng/Sai</option><option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Trả lời ngắn</option><option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận</option></select></div>
+              <div class="col-3"><label class="small">Điểm</label><input class="form-control form-control-sm" type="number" step="0.01" name="questions[<%= i %>][points]" value="<%= q.points %>"></div>
+              <div class="col-4 option-count"><label class="small">Số lựa chọn/ý</label><input class="form-control form-control-sm" type="number" min="2" max="8" name="questions[<%= i %>][option_count]" value="<%= q.optionCount || 4 %>"></div>
+              <div class="col-8"><label class="small answer-label">Đáp án (A/B/C/D hoặc true,false...)</label><input class="form-control form-control-sm" name="questions[<%= i %>][answer]" value="<%= q.answer %>"></div>
+              <input type="hidden" name="questions[<%= i %>][section_title]" value="<%= q.sectionTitle %>">
+            </div>
+          </div>
+        <% }) %>
+        </div>
+      </section>
+    </div>
+  </form>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+const pdf=await pdfjsLib.getDocument('/admin/bai-kiem-tra/<%= quiz.id %>/de.pdf').promise; let current=1;
+async function render(n){ current=Math.max(1,Math.min(pdf.numPages,n)); document.getElementById('pageNum').textContent=current; const page=await pdf.getPage(current); const wrap=document.getElementById('pdfCanvasWrap'); const base=page.getViewport({scale:1}); const scale=Math.min(1.8,(wrap.clientWidth-32)/base.width); const vp=page.getViewport({scale}); const c=document.getElementById('pdfCanvas'); c.width=vp.width;c.height=vp.height; await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise; }
+document.getElementById('prevPage').onclick=()=>render(current-1); document.getElementById('nextPage').onclick=()=>render(current+1); render(1);
+document.getElementById('questionRows').addEventListener('click',e=>{const row=e.target.closest('.qrow'); if(!row)return; document.querySelectorAll('.qrow').forEach(x=>x.classList.remove('active'));row.classList.add('active');render(Number(row.querySelector('.page-input').value)||1)});
+let idx=<%= parsed.questions.length %>;
+document.getElementById('addQuestion').onclick=()=>{ const div=document.createElement('div');div.className='qrow';div.innerHTML=`<div class="d-flex gap-2 mb-2"><input class="form-check-input" type="checkbox" name="questions[${idx}][include]" checked><strong>Câu</strong><input class="form-control form-control-sm" style="width:70px" name="questions[${idx}][display_number]" value="${idx+1}"></div><div class="row g-2"><div class="col-3"><label class="small">Trang</label><input class="form-control form-control-sm page-input" type="number" min="1" max="${pdf.numPages}" name="questions[${idx}][page]" value="${current}"></div><div class="col-6"><label class="small">Dạng câu</label><select class="form-select form-select-sm" name="questions[${idx}][type]"><option value="single_choice">Trắc nghiệm</option><option value="true_false">Đúng/Sai</option><option value="short_answer">Trả lời ngắn</option><option value="essay">Tự luận</option></select></div><div class="col-3"><label class="small">Điểm</label><input class="form-control form-control-sm" name="questions[${idx}][points]" value="0.25"></div><div class="col-4"><label class="small">Số lựa chọn/ý</label><input class="form-control form-control-sm" name="questions[${idx}][option_count]" value="4"></div><div class="col-8"><label class="small">Đáp án</label><input class="form-control form-control-sm" name="questions[${idx}][answer]"></div></div>`;document.getElementById('questionRows').appendChild(div);idx++;};
+</script>
+<%- include('../partials/footer') %>

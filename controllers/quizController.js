@@ -94,3 +94,16 @@ exports.myAssignments = async (req, res) => {
   const assignments = await Quiz.myAssignments(req.session.user.id);
   res.render('student/my-assignments', { assignments });
 };
+
+
+// Trả file PDF gốc của đề thi từ database để học sinh xem trực tiếp.
+exports.pdfDocument = async (req, res) => {
+  const quiz = await Quiz.findById(req.params.id);
+  if (!quiz || !quiz.pdf_exam_mode) return res.status(404).end();
+  const doc = await Quiz.getPdfDocument(quiz.id);
+  if (!doc) return res.status(404).end();
+  res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${String(doc.filename || 'de-thi.pdf').replace(/"/g, '')}"`);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.send(doc.pdf_data);
+};

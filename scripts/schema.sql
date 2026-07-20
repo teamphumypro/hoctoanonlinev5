@@ -512,3 +512,19 @@ CREATE TABLE IF NOT EXISTS online_book_categories (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE online_books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES online_book_categories(id) ON DELETE SET NULL;
+
+
+-- ---------- CHE DO DE PDF + BAI LAM BEN CANH ----------
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_exam_mode INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_page_count INTEGER;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_question_map JSONB;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS source_page INTEGER;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS display_number TEXT;
+
+CREATE TABLE IF NOT EXISTS quiz_pdf_documents (
+  quiz_id INTEGER PRIMARY KEY REFERENCES quizzes(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+  pdf_data BYTEA NOT NULL,
+  uploaded_at TIMESTAMPTZ DEFAULT now()
+);
