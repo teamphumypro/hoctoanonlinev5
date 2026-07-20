@@ -1,185 +1,63 @@
-<% var pageTitle = 'Xem trước & sửa trước khi lưu' %>
+<% var pageTitle = 'Kiểm tra đề PDF trước khi lưu' %>
 <%- include('../../partials/admin-header') %>
-
-<div class="d-flex justify-content-between align-items-start mb-3">
-  <div>
-    <h5 class="fw-bold mb-1">Xem trước & sửa trước khi lưu</h5>
-    <p class="small text-muted mb-0">
-      Nhận diện được <strong><%= rows.length %></strong> câu hỏi trên <strong><%= totalPages %></strong> trang.
-      Học sinh sẽ nhìn thấy nguyên trang PDF gốc — bảng bên dưới chỉ là <strong>thông tin để chấm điểm</strong>
-      (trang nào, đáp án đúng là gì), không phải nội dung hiển thị.
-    </p>
-  </div>
-  <a href="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" class="btn btn-outline-secondary btn-sm">Hủy, tải lại file khác</a>
-</div>
-
-<% if (error) { %><div class="alert alert-warning small"><%= error %></div><% } %>
-
-<div class="row g-3">
-  <div class="col-lg-5">
-    <div class="card p-3" style="position:sticky; top:12px;">
-      <h6 class="fw-bold mb-2">Xem trước trang PDF</h6>
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <button type="button" id="prevPageBtn" class="btn btn-outline-secondary btn-sm">&larr;</button>
-        <span class="small">Trang <input type="number" id="pageInput" value="1" min="1" max="<%= totalPages %>" style="width:60px" class="form-control form-control-sm d-inline-block text-center"> / <%= totalPages %></span>
-        <button type="button" id="nextPageBtn" class="btn btn-outline-secondary btn-sm">&rarr;</button>
-      </div>
-      <div id="pdfPreviewWrap" style="border:1px solid #eee; border-radius:8px; overflow:auto; max-height:70vh; text-align:center; background:#f8f8f8;">
-        <canvas id="pdfCanvas" style="max-width:100%;"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-7">
-    <form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="reviewForm">
-      <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
-      <input type="hidden" name="pdf_path" value="<%= pdfPath %>">
-      <input type="hidden" name="total_pages" value="<%= totalPages %>">
-      <input type="hidden" name="redirect_to" value="/admin/bai-kiem-tra/<%= quiz.id %>/cau-hoi">
-
-      <div class="card p-3 mb-2">
-        <button type="button" id="addRowBtn" class="btn btn-sm btn-outline-primary" style="width:fit-content">+ Thêm câu thủ công</button>
-      </div>
-
-      <div id="rowsWrap"></div>
-
-      <div class="card p-3 mt-2 d-flex flex-row gap-2">
-        <button class="btn btn-primary">Lưu đề thi</button>
-        <span class="small text-muted align-self-center">Ô "Trang" quyết định câu này hiện ra khi học sinh lật tới trang nào.</span>
-      </div>
-    </form>
-  </div>
-</div>
-
 <style>
-  .qrow{ border:1px solid #eee; border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fff; }
-  .qrow.needs-review{ border-color:#e0a800; background:#fffbea; }
-  .qrow .row-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-  .qrow input[type=number], .qrow select, .qrow input[type=text]{ font-size:.85rem; }
+  .pdf-review-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(420px,.65fr);gap:16px;height:calc(100vh - 105px)}
+  .pdf-stage,.map-stage{background:#fff;border:1px solid #dde2ea;border-radius:12px;overflow:hidden}
+  .pdf-stage{display:flex;flex-direction:column;min-width:0}.pdf-toolbar{padding:10px 12px;border-bottom:1px solid #e8ebf0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .flip-viewport{flex:1;min-height:0;overflow:hidden;background:radial-gradient(circle at center,#f8f9fb 0,#e8ecf2 72%);padding:18px;perspective:1800px;position:relative}
+  .book-wrap{height:100%;max-width:1050px;margin:auto;display:flex;align-items:center;justify-content:center;position:relative}
+  .book-sheet{position:absolute;width:min(94%,900px);height:96%;background:#fff;border-radius:5px;box-shadow:0 18px 45px #1b25352e,0 2px 7px #0002;transform-style:preserve-3d;transform-origin:left center;overflow:hidden;backface-visibility:hidden;transition:transform .55s cubic-bezier(.2,.7,.15,1),opacity .28s ease}
+  .book-sheet::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#00000012,transparent 5%,transparent 94%,#0000000c)}
+  .book-sheet iframe{width:100%;height:100%;border:0;background:#fff;display:block}.book-sheet.is-hidden{opacity:0;pointer-events:none}.book-sheet.flip-next-out{transform:rotateY(-92deg);opacity:.2}.book-sheet.flip-prev-out{transform-origin:right center;transform:rotateY(92deg);opacity:.2}
+  .page-shadow{position:absolute;bottom:1%;width:min(86%,820px);height:22px;background:#1a233026;filter:blur(12px);border-radius:50%}
+  .map-stage{overflow:auto;padding:14px}.qrow{border:1px solid #e2e7ee;border-radius:10px;padding:10px;margin-bottom:10px;background:#fff;cursor:pointer}.qrow.active{border-color:#2f62d4;box-shadow:0 0 0 2px #2f62d422}
+  .loading-note{position:absolute;z-index:4;padding:9px 14px;border-radius:999px;background:#fff;box-shadow:0 4px 18px #0002;font-size:.875rem}.type-help{font-size:.78rem;color:#677286;margin-top:6px}.manual-note{background:#fff7db;border:1px solid #f1d77c;border-radius:8px;padding:8px;font-size:.8rem}
+  @media(max-width:900px){.pdf-review-grid{grid-template-columns:1fr;height:auto}.pdf-stage{height:72vh}.map-stage{max-height:none}.flip-viewport{padding:8px}.book-sheet{width:98%;height:98%}}
 </style>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<div class="container-fluid py-2">
+  <form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="savePdfExamForm">
+    <input type="hidden" name="quiz_id" value="<%= quiz.id %>"><input type="hidden" name="page_count" value="<%= parsed.pageCount %>"><input type="hidden" name="original_name" value="<%= originalName %>">
+    <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+      <div><h5 class="fw-bold mb-0">Kiểm tra phân trang, dạng câu và đáp án</h5><small class="text-muted">Đã tìm <%= parsed.questions.length %> câu trên <%= parsed.pageCount %> trang. Hệ thống tự nhận diện, giáo viên có thể sửa toàn bộ.</small></div>
+      <div><button type="button" class="btn btn-outline-primary btn-sm" id="addQuestion">+ Thêm câu</button> <button class="btn btn-success">Lưu đề PDF</button></div>
+    </div>
+    <div class="alert alert-info py-2 small"><strong>Cách chấm:</strong> Trắc nghiệm và trả lời ngắn chấm tự động; Đúng/Sai chấm theo số ý đúng; Tự luận lưu bài để giáo viên chấm tay trong trang kết quả.</div>
+    <div class="pdf-review-grid">
+      <section class="pdf-stage">
+        <div class="pdf-toolbar"><button type="button" class="btn btn-sm btn-outline-secondary" id="prevPage">← Trang trước</button><strong>Trang <span id="pageNum">1</span>/<%= parsed.pageCount %></strong><button type="button" class="btn btn-sm btn-outline-secondary" id="nextPage">Trang sau →</button><button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="openPdf">Mở PDF gốc</button><span class="ms-auto small text-muted">Bấm câu bên phải để lật đến đúng trang</span></div>
+        <div class="flip-viewport"><div class="book-wrap"><div class="page-shadow"></div><div class="loading-note" id="pdfLoading">Đang mở trang PDF…</div><div class="book-sheet" id="sheetA"><iframe title="Trang đề thi" loading="eager"></iframe></div><div class="book-sheet is-hidden" id="sheetB"><iframe title="Trang đề thi kế tiếp" loading="eager"></iframe></div></div></div>
+      </section>
+      <section class="map-stage"><% if (parsed.warnings && parsed.warnings.length) { %><div class="alert alert-warning small"><%= parsed.warnings.join(' ') %></div><% } %><div id="questionRows">
+        <% parsed.questions.forEach((q,i)=>{ %>
+          <div class="qrow" data-page="<%= q.page %>">
+            <div class="d-flex align-items-center gap-2 mb-2"><input class="form-check-input" type="checkbox" name="questions[<%= i %>][include]" checked><strong>Câu</strong><input class="form-control form-control-sm" style="width:70px" name="questions[<%= i %>][display_number]" value="<%= q.displayNumber %>"><span class="ms-auto badge text-bg-light">Tự nhận diện</span></div>
+            <div class="row g-2">
+              <div class="col-3"><label class="small">Trang</label><input class="form-control form-control-sm page-input" type="number" min="1" max="<%= parsed.pageCount %>" name="questions[<%= i %>][page]" value="<%= q.page %>"></div>
+              <div class="col-6"><label class="small">Dạng câu</label><select class="form-select form-select-sm type-select" name="questions[<%= i %>][type]"><option value="single_choice" <%= q.type==='single_choice'?'selected':'' %>>Trắc nghiệm</option><option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Đúng/Sai</option><option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Trả lời ngắn</option><option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận</option></select></div>
+              <div class="col-3"><label class="small">Điểm</label><input class="form-control form-control-sm" type="number" step="0.01" name="questions[<%= i %>][points]" value="<%= q.points %>"></div>
+              <div class="col-4 option-count"><label class="small option-label">Số lựa chọn/ý</label><input class="form-control form-control-sm" type="number" min="2" max="8" name="questions[<%= i %>][option_count]" value="<%= q.optionCount || 4 %>"></div>
+              <div class="col-8 answer-wrap"><label class="small answer-label">Đáp án</label><input class="form-control form-control-sm answer-input" name="questions[<%= i %>][answer]" value="<%= q.answer %>"></div>
+              <div class="col-12 type-help"></div><input type="hidden" name="questions[<%= i %>][section_title]" value="<%= q.sectionTitle %>">
+            </div>
+          </div>
+        <% }) %>
+      </div></section>
+    </div>
+  </form>
+</div>
 <script>
-const initialRows = <%- JSON.stringify(rows) %>;
-const pdfUrl = <%- JSON.stringify(pdfPath) %>;
-const totalPages = <%- totalPages %>;
-let rowSeq = 0;
-
-// ---- Xem truoc PDF (dung pdf.js, giong het co che dang dung o phan Doc sach online) ----
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-let pdfDoc = null;
-const canvas = document.getElementById('pdfCanvas');
-const ctx = canvas.getContext('2d');
-async function renderPage(n) {
-  if (!pdfDoc) return;
-  n = Math.min(Math.max(1, n), totalPages);
-  document.getElementById('pageInput').value = n;
-  const page = await pdfDoc.getPage(n);
-  const viewport = page.getViewport({ scale: 1.3 });
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  await page.render({ canvasContext: ctx, viewport }).promise;
-}
-pdfjsLib.getDocument(pdfUrl).promise.then(doc => { pdfDoc = doc; renderPage(1); });
-document.getElementById('prevPageBtn').onclick = () => renderPage(parseInt(document.getElementById('pageInput').value) - 1);
-document.getElementById('nextPageBtn').onclick = () => renderPage(parseInt(document.getElementById('pageInput').value) + 1);
-document.getElementById('pageInput').addEventListener('change', (e) => renderPage(parseInt(e.target.value) || 1));
-
-// ---- Bang cau hoi co the sua ----
-const typeLabels = { single_choice: 'Trắc nghiệm nhiều lựa chọn', true_false: 'Đúng / sai', short_answer: 'Trả lời ngắn', essay: 'Tự luận (chấm tay)' };
-
-function renderRow(row) {
-  const id = 'r' + (rowSeq++);
-  const needsReview = row.needsReview;
-  const correctAnswerText = row.correctAnswerText != null ? row.correctAnswerText : '';
-  const correctIndex = row.correctIndex != null ? row.correctIndex : 0;
-  const correctFlags = row.correctFlags || [false, false, false, false];
-  const optionCount = row.optionCount || 4;
-  const points = row.type === 'true_false' ? 1 : (row.type === 'essay' ? 2 : 0.25);
-
-  const div = document.createElement('div');
-  div.className = 'qrow' + (needsReview ? ' needs-review' : '');
-  div.innerHTML = `
-    <div class="row-head">
-      <input type="checkbox" name="questions[${id}][include]" checked>
-      <strong class="small">Câu ${row.number || ''}${row.section ? ' — Phần ' + row.section : ''}</strong>
-      ${needsReview ? '<span class="badge bg-warning text-dark">chưa rõ đáp án — kiểm tra lại</span>' : ''}
-      <button type="button" class="btn btn-sm btn-link text-danger ms-auto remove-row">Xóa</button>
-    </div>
-    <div class="row g-2">
-      <div class="col-auto">
-        <label class="form-label small mb-0">Trang</label>
-        <input type="number" name="questions[${id}][page]" value="${row.page || 1}" min="1" max="${totalPages}" class="form-control form-control-sm goto-page" style="width:70px">
-      </div>
-      <input type="hidden" name="questions[${id}][number]" value="${row.number || ''}">
-      <div class="col-auto">
-        <label class="form-label small mb-0">Dạng câu</label>
-        <select name="questions[${id}][type]" class="form-select form-select-sm type-select">
-          ${Object.entries(typeLabels).map(([v,l]) => `<option value="${v}" ${v===row.type?'selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="col-auto option-count-wrap">
-        <label class="form-label small mb-0">Số phương án</label>
-        <input type="number" name="questions[${id}][option_count]" value="${optionCount}" min="2" max="8" class="form-control form-control-sm" style="width:70px">
-      </div>
-      <div class="col-auto">
-        <label class="form-label small mb-0">Điểm</label>
-        <input type="number" step="0.25" name="questions[${id}][points]" value="${points}" class="form-control form-control-sm" style="width:70px">
-      </div>
-    </div>
-    <div class="answer-area mt-2"></div>
-    <div class="row g-2 mt-1 align-items-end">
-      <div class="col-auto">
-        <label class="form-label small mb-0">Trang lời giải (trong file PDF này)</label>
-        <input type="number" name="questions[${id}][solution_page]" value="${row.solutionPage || ''}" min="1" max="${totalPages}" class="form-control form-control-sm" style="width:80px" placeholder="—">
-      </div>
-      <div class="col-auto small text-muted" style="max-width:260px">
-        Học sinh sẽ được xem đúng trang này (ảnh PDF gốc, giữ nguyên công thức) sau khi nộp bài — không cần gõ lại lời giải.
-      </div>
-    </div>
-    <div class="mt-2">
-      <label class="form-label small mb-0">Ghi chú ngắn (tùy chọn — chỉ là chữ thường, không hiển thị được công thức)</label>
-      <textarea name="questions[${id}][explanation]" class="form-control form-control-sm" rows="1"></textarea>
-    </div>
-  `;
-
-  function renderAnswerArea() {
-    const type = div.querySelector('.type-select').value;
-    const area = div.querySelector('.answer-area');
-    const optCountEl = div.querySelector('.option-count-wrap');
-    if (type === 'single_choice') {
-      optCountEl.style.display = '';
-      const n = parseInt(div.querySelector('[name$="[option_count]"]').value) || 4;
-      const letters = 'ABCDEFGH'.slice(0, n).split('');
-      area.innerHTML = '<label class="form-label small mb-0">Đáp án đúng</label><div class="d-flex gap-2 flex-wrap">' +
-        letters.map((l, i) => `<label class="small"><input type="radio" name="questions[${id}][correct_index]" value="${i}" ${i===correctIndex?'checked':''}> ${l}</label>`).join('') + '</div>';
-    } else if (type === 'true_false') {
-      optCountEl.style.display = '';
-      const n = parseInt(div.querySelector('[name$="[option_count]"]').value) || 4;
-      const letters = 'abcdefgh'.slice(0, n).split('');
-      area.innerHTML = '<label class="form-label small mb-0">Ý nào đúng</label><div class="d-flex gap-2 flex-wrap">' +
-        letters.map((l, i) => `<label class="small"><input type="checkbox" name="questions[${id}][tf_correct][]" value="${i}" ${correctFlags[i]?'checked':''}> ${l}</label>`).join('') + '</div>';
-    } else if (type === 'short_answer') {
-      optCountEl.style.display = 'none';
-      area.innerHTML = `<label class="form-label small mb-0">Đáp án đúng</label><input type="text" name="questions[${id}][correct_answer]" value="${correctAnswerText.replace(/"/g,'&quot;')}" class="form-control form-control-sm" style="max-width:200px">`;
-    } else {
-      optCountEl.style.display = 'none';
-      area.innerHTML = '<span class="small text-muted">Câu tự luận — giáo viên chấm tay sau khi học sinh nộp bài.</span>';
-    }
-  }
-  div.querySelector('.type-select').addEventListener('change', renderAnswerArea);
-  div.querySelector('[name$="[option_count]"]').addEventListener('input', renderAnswerArea);
-  div.querySelector('.remove-row').addEventListener('click', () => div.remove());
-  div.querySelector('.goto-page').addEventListener('change', (e) => renderPage(parseInt(e.target.value) || 1));
-  renderAnswerArea();
-  return div;
-}
-
-const rowsWrap = document.getElementById('rowsWrap');
-initialRows.forEach(row => rowsWrap.appendChild(renderRow(row)));
-document.getElementById('addRowBtn').addEventListener('click', () => {
-  rowsWrap.appendChild(renderRow({ type: 'single_choice', page: parseInt(document.getElementById('pageInput').value) || 1, optionCount: 4 }));
-});
+(() => {
+  const totalPages=<%= parsed.pageCount %>, pdfUrl='/admin/bai-kiem-tra/<%= quiz.id %>/de.pdf';
+  const sheets=[document.getElementById('sheetA'),document.getElementById('sheetB')],loading=document.getElementById('pdfLoading');let activeIndex=0,current=1,turning=false;
+  const srcFor=page=>`${pdfUrl}?preview=1&page=${page}#page=${page}&zoom=page-fit&toolbar=0&navpanes=0&scrollbar=0`;
+  function setFrame(sheet,page,done){const frame=sheet.querySelector('iframe');let finished=false;const complete=()=>{if(finished)return;finished=true;done()};frame.addEventListener('load',complete,{once:true});frame.src=srcFor(page);setTimeout(complete,1800)}
+  function showPage(number,animate=true){const nextPage=Math.max(1,Math.min(totalPages,Number(number)||1));if(turning||(nextPage===current&&animate))return;const dir=nextPage>=current?1:-1,old=sheets[activeIndex],newIndex=1-activeIndex,next=sheets[newIndex];turning=true;loading.hidden=false;next.className='book-sheet is-hidden';setFrame(next,nextPage,()=>{next.className='book-sheet';if(animate)old.classList.add(dir>0?'flip-next-out':'flip-prev-out');else old.classList.add('is-hidden');setTimeout(()=>{old.className='book-sheet is-hidden';activeIndex=newIndex;current=nextPage;turning=false;loading.hidden=true;document.getElementById('pageNum').textContent=current},animate?560:40)})}
+  document.getElementById('prevPage').onclick=()=>showPage(current-1);document.getElementById('nextPage').onclick=()=>showPage(current+1);document.getElementById('openPdf').onclick=()=>window.open(`${pdfUrl}#page=${current}`,'_blank','noopener');
+  const help={single_choice:['Số lựa chọn','Đáp án đúng: A, B, C…','Chấm tự động: chọn đúng được toàn bộ điểm.'],true_false:['Số ý','Nhập: Đ,S,Đ,Đ (hoặc true,false,true,true)','Chấm tự động theo số ý đúng.'],short_answer:['Không dùng','Có thể nhập nhiều đáp án: 5,91 | 5.91','Chấm tự động, tự chuẩn hóa dấu phẩy/dấu chấm.'],essay:['Không dùng','Không cần nhập đáp án','Học sinh viết bài; giáo viên chấm tay sau khi nộp.']};
+  function updateType(row){const type=row.querySelector('.type-select').value,[opt,ans,note]=help[type];row.querySelector('.option-label').textContent=opt;row.querySelector('.answer-label').textContent=ans;row.querySelector('.type-help').innerHTML=type==='essay'?`<div class="manual-note">${note}</div>`:note;row.querySelector('.option-count').style.display=['short_answer','essay'].includes(type)?'none':'';row.querySelector('.answer-wrap').style.display=type==='essay'?'none':''}
+  document.querySelectorAll('.qrow').forEach(updateType);document.getElementById('questionRows').addEventListener('change',e=>{if(e.target.classList.contains('type-select'))updateType(e.target.closest('.qrow'))});
+  document.getElementById('questionRows').addEventListener('click',e=>{const row=e.target.closest('.qrow');if(!row)return;document.querySelectorAll('.qrow').forEach(x=>x.classList.remove('active'));row.classList.add('active');showPage(Number(row.querySelector('.page-input').value)||1)});
+  let idx=<%= parsed.questions.length %>;document.getElementById('addQuestion').onclick=()=>{const div=document.createElement('div');div.className='qrow';div.innerHTML=`<div class="d-flex gap-2 mb-2"><input class="form-check-input" type="checkbox" name="questions[${idx}][include]" checked><strong>Câu</strong><input class="form-control form-control-sm" style="width:70px" name="questions[${idx}][display_number]" value="${idx+1}"></div><div class="row g-2"><div class="col-3"><label class="small">Trang</label><input class="form-control form-control-sm page-input" type="number" min="1" max="${totalPages}" name="questions[${idx}][page]" value="${current}"></div><div class="col-6"><label class="small">Dạng câu</label><select class="form-select form-select-sm type-select" name="questions[${idx}][type]"><option value="single_choice">Trắc nghiệm</option><option value="true_false">Đúng/Sai</option><option value="short_answer">Trả lời ngắn</option><option value="essay">Tự luận</option></select></div><div class="col-3"><label class="small">Điểm</label><input class="form-control form-control-sm" name="questions[${idx}][points]" value="0.25"></div><div class="col-4 option-count"><label class="small option-label">Số lựa chọn</label><input class="form-control form-control-sm" name="questions[${idx}][option_count]" value="4"></div><div class="col-8 answer-wrap"><label class="small answer-label">Đáp án đúng: A, B, C…</label><input class="form-control form-control-sm answer-input" name="questions[${idx}][answer]"></div><div class="col-12 type-help"></div></div>`;document.getElementById('questionRows').appendChild(div);updateType(div);idx++};showPage(1,false)
+})();
 </script>
-
 <%- include('../../partials/admin-footer') %>

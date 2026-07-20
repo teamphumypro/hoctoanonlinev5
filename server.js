@@ -1,4 +1,7 @@
-require('dotenv').config();
+try { require('dotenv').config(); } catch (err) {
+  if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
+  console.warn('[env] dotenv not installed; using Render/system environment variables.');
+}
 const express = require('express');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
