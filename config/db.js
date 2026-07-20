@@ -1,8 +1,5 @@
 // Ket noi PostgreSQL (dung duoc voi Neon, Supabase, Render Postgres... bat ky nha cung cap nao co DATABASE_URL)
-try { require('dotenv').config(); } catch (err) {
-  if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
-  console.warn('[env] dotenv not installed; using Render/system environment variables.');
-}
+require('dotenv').config();
 const { Pool } = require('pg');
 
 if (!process.env.DATABASE_URL) {

@@ -1,4 +1,9 @@
 const db = require('../config/db');
+// Lop bao ve cuoi cung, chay TRUOC MOI luot ghi cau hoi vao CSDL, bat ke du lieu den tu
+// bo tach de tu dong, tu AI, hay tu giao vien go/sua tay o form duyet de - dam bao khong
+// bao gio luu (va sau do hien thi cho hoc sinh) mot placeholder tham chieu cong thuc/anh
+// (vd dang Azota "[!m:$mathtype_2$]") o dang tho, chua duoc xu ly.
+const { sanitizeQuestionPayload } = require('../services/examImport/mathReference');
 
 const Quiz = {
   async findByLesson(lesson_id) {
@@ -148,66 +153,6 @@ const Quiz = {
     return r.rows;
   },
 
-
-  async savePdfDocument(quiz_id, { pdfBuffer, filename }) {
-    await db.query(`INSERT INTO quiz_pdf_documents (quiz_id, filename, mime_type, pdf_data) VALUES ($1,$2,'application/pdf',$3) ON CONFLICT (quiz_id) DO UPDATE SET filename=EXCLUDED.filename, mime_type=EXCLUDED.mime_type, pdf_data=EXCLUDED.pdf_data, uploaded_at=now()`, [quiz_id, filename, pdfBuffer]);
-  },
-  async replaceWithPdfExam(quiz_id, { pdfBuffer, filename, pageCount, questionMap, questions }) {
-    const client = await db.getClient();
-    try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM quiz_questions WHERE quiz_id=$1', [quiz_id]);
-      if (pdfBuffer) {
-        await client.query(
-          `INSERT INTO quiz_pdf_documents (quiz_id, filename, mime_type, pdf_data) VALUES ($1,$2,'application/pdf',$3)
-           ON CONFLICT (quiz_id) DO UPDATE SET filename=EXCLUDED.filename, mime_type=EXCLUDED.mime_type, pdf_data=EXCLUDED.pdf_data, uploaded_at=now()`,
-          [quiz_id, filename || `de-thi-${quiz_id}.pdf`, pdfBuffer]
-        );
-      }
-      await client.query(
-        `UPDATE quizzes SET pdf_exam_mode=1, pdf_page_count=$2, pdf_question_map=$3::jsonb WHERE id=$1`,
-        [quiz_id, pageCount, JSON.stringify(questionMap || [])]
-      );
-      let position = 0;
-      for (const row of questions) {
-        position += 1;
-        const qText = `Câu ${row.displayNumber || position} — xem đề PDF trang ${row.page}`;
-        const qr = await client.query(
-          `INSERT INTO quiz_questions (quiz_id, question, type, points, position, correct_answer, source_page, display_number)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-          [quiz_id, qText, row.type, Number(row.points) || 0.25, position, row.type === 'short_answer' ? (row.answer || '') : null, Number(row.page) || 1, String(row.displayNumber || position)]
-        );
-        const questionId = qr.rows[0].id;
-        if (row.type === 'single_choice') {
-          const count = Math.max(2, Math.min(8, Number(row.optionCount) || 4));
-          const correct = String(row.answer || '').trim().toUpperCase();
-          for (let i=0;i<count;i++) {
-            const label = String.fromCharCode(65+i);
-            await client.query('INSERT INTO quiz_options (question_id, option_text, is_correct) VALUES ($1,$2,$3)', [questionId, label, label === correct ? 1 : 0]);
-          }
-        } else if (row.type === 'true_false') {
-          const normalizeTf = value => {
-            const v = String(value || '').trim().toLowerCase();
-            return ['true','đ','d','đúng','dung','1','t'].includes(v);
-          };
-          const answers = String(row.answer || '').split(/[,;|]/).map(v => v.trim()).filter(Boolean);
-          const count = Math.max(2, Math.min(8, Number(row.optionCount) || answers.length || 4));
-          for (let i=0;i<count;i++) {
-            await client.query('INSERT INTO quiz_tf_items (question_id, content, is_correct, position) VALUES ($1,$2,$3,$4)', [questionId, `Ý ${String.fromCharCode(97+i)})`, normalizeTf(answers[i]) ? 1 : 0, i]);
-          }
-        }
-      }
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally { client.release(); }
-  },
-  async getPdfDocument(quiz_id) {
-    const r = await db.query('SELECT filename, mime_type, pdf_data FROM quiz_pdf_documents WHERE quiz_id=$1', [quiz_id]);
-    return r.rows[0];
-  },
-
   // Lay toan bo cau hoi (kem dap an/y dung-sai) cua 1 bai kiem tra
   async fullQuestions(quiz_id) {
     const questions = (await db.query('SELECT * FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, id', [quiz_id])).rows;
@@ -227,10 +172,16 @@ const Quiz = {
   },
 
   // ---- Them cau hoi theo tung dang ----
-  async addSingleChoiceQuestion({ quiz_id, question, points, options, correctIndex, position, explanation }) {
+  // page_number/solution_page la tuy chon (null neu khong phai de dang PDF sach lat) - trang PDF
+  // cau hoi nay xuat hien / trang chua loi giai chi tiet, dung de dong bo voi flipbook.
+  async addSingleChoiceQuestion(input) {
+    const { row: { question, points, options, correctIndex, position, explanation } } = sanitizeQuestionPayload(input);
+    const quiz_id = input.quiz_id;
+    const page_number = input.page_number || null;
+    const solution_page = input.solution_page || null;
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'single_choice',$3,$4,$5) RETURNING *`,
-      [quiz_id, question, points || 0.25, position || 0, explanation || null]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'single_choice',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 0.25, position || 0, explanation || null, page_number, solution_page]
     );
     for (let i = 0; i < options.length; i++) {
       if (!options[i] || !options[i].trim()) continue;
@@ -241,11 +192,15 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addTrueFalseQuestion({ quiz_id, question, points, items, position, explanation }) {
+  async addTrueFalseQuestion(input) {
     // items: [{ content, is_correct }, ...] toi da 4 y (a,b,c,d)
+    const { row: { question, points, items, position, explanation } } = sanitizeQuestionPayload(input);
+    const quiz_id = input.quiz_id;
+    const page_number = input.page_number || null;
+    const solution_page = input.solution_page || null;
     const q = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'true_false',$3,$4,$5) RETURNING *`,
-      [quiz_id, question, points || 1, position || 0, explanation || null]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'true_false',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 1, position || 0, explanation || null, page_number, solution_page]
     );
     for (const item of items) {
       if (!item.content || !item.content.trim()) continue;
@@ -256,19 +211,31 @@ const Quiz = {
     }
     return q.rows[0];
   },
-  async addShortAnswerQuestion({ quiz_id, question, points, correct_answer, position, explanation }) {
+  async addShortAnswerQuestion(input) {
+    const { row: { question, points, correct_answer, position, explanation } } = sanitizeQuestionPayload(input);
+    const quiz_id = input.quiz_id;
+    const page_number = input.page_number || null;
+    const solution_page = input.solution_page || null;
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position, explanation) VALUES ($1,$2,'short_answer',$3,$4,$5,$6) RETURNING *`,
-      [quiz_id, question, points || 0.25, correct_answer, position || 0, explanation || null]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, correct_answer, position, explanation, page_number, solution_page) VALUES ($1,$2,'short_answer',$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [quiz_id, question, points || 0.25, correct_answer, position || 0, explanation || null, page_number, solution_page]
     );
     return r.rows[0];
   },
-  async addEssayQuestion({ quiz_id, question, points, position, explanation }) {
+  async addEssayQuestion(input) {
+    const { row: { question, points, position, explanation } } = sanitizeQuestionPayload(input);
+    const quiz_id = input.quiz_id;
+    const page_number = input.page_number || null;
+    const solution_page = input.solution_page || null;
     const r = await db.query(
-      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation) VALUES ($1,$2,'essay',$3,$4,$5) RETURNING *`,
-      [quiz_id, question, points || 2, position || 0, explanation || null]
+      `INSERT INTO quiz_questions (quiz_id, question, type, points, position, explanation, page_number, solution_page) VALUES ($1,$2,'essay',$3,$4,$5,$6,$7) RETURNING *`,
+      [quiz_id, question, points || 2, position || 0, explanation || null, page_number, solution_page]
     );
     return r.rows[0];
+  },
+  // Gan file PDF nguon (sach lat) cho 1 de thi - dung khi import theo cach moi
+  async setPdfSource(quiz_id, pdfPath, totalPages) {
+    await db.query('UPDATE quizzes SET pdf_source_path=$1, pdf_total_pages=$2 WHERE id=$3', [pdfPath, totalPages, quiz_id]);
   },
   async deleteQuestion(id) {
     await db.query('DELETE FROM quiz_questions WHERE id=$1', [id]);
@@ -289,7 +256,7 @@ const Quiz = {
     for (const q of questions) {
       const val = answers[q.id];
       let earned = 0;
-      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points), explanation: q.explanation || null };
+      let detail = { questionId: q.id, question: q.question, type: q.type, maxPoints: Number(q.points), explanation: q.explanation || null, solutionPage: q.solution_page || null };
 
       if (q.type === 'single_choice') {
         const correctOption = q.options.find(o => o.is_correct);
@@ -316,14 +283,8 @@ const Quiz = {
         detail.items = itemResults;
 
       } else if (q.type === 'short_answer') {
-        // Cho phép nhiều đáp án tương đương, cách nhau bởi | hoặc ;.
-        // Chuẩn hóa dấu phẩy/dấu chấm thập phân và khoảng trắng để học sinh không bị trừ oan.
-        const normalize = input => String(input || '')
-          .trim().toLowerCase().replace(/\s+/g, '')
-          .replace(/,/g, '.');
-        const accepted = String(q.correct_answer || '').split(/[|;]/).map(normalize).filter(Boolean);
-        const submitted = normalize(val);
-        const isCorrect = submitted !== '' && accepted.includes(submitted);
+        const normalize = s => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+        const isCorrect = normalize(val) !== '' && normalize(val) === normalize(q.correct_answer);
         earned = isCorrect ? Number(q.points) : 0;
         detail.isCorrect = isCorrect;
         detail.yourAnswer = val || '';
