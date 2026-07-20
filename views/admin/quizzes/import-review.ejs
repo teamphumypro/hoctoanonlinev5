@@ -1,163 +1,71 @@
-<% var pageTitle = 'Xem trước & sửa đề đã tải lên' %>
+<% var pageTitle = 'Biên tập đề kiểu Azota' %>
 <%- include('../../partials/admin-header') %>
+<style>
+  .az-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(420px,48%);gap:12px;height:calc(100vh - 130px)}
+  .az-visual,.az-source{overflow:auto;border:1px solid #dbe2ea;background:#f5f7fb;border-radius:10px}
+  .az-source{background:#fff;position:relative}.az-toolbar{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid #ddd;padding:8px;display:flex;gap:8px;align-items:center}
+  .az-source textarea{border:0;resize:none;width:100%;min-height:calc(100% - 52px);padding:12px 12px 60px 54px;font-family:Consolas,monospace;font-size:13px;line-height:1.55;color:#b42318;background:linear-gradient(to right,#f7f7f7 0,#f7f7f7 44px,#ddd 45px,#fff 46px)}
+  .az-card{background:#fff;border:1px solid #cfd8e3;border-radius:8px;margin:10px;overflow:hidden}.az-card-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #e5e7eb}.az-card-body{padding:12px}
+  .exam-math{display:inline-block;vertical-align:middle}.exam-math-img{display:inline-block;vertical-align:middle;max-height:2.2em;width:auto}.exam-content-img{display:block;max-width:100%;max-height:420px;margin:8px auto}.exam-missing-asset{color:#b42318;background:#fff2f0;padding:1px 4px;border-radius:4px}
+  .editable{border:1px solid #d9dee6;border-radius:5px;padding:8px;min-height:40px}.option-edit{display:flex;gap:7px;align-items:flex-start;margin:6px 0}.option-edit .editable{flex:1;min-height:34px;padding:5px 8px}
+  .solution-box{border-top:1px solid #ead7a5;margin-top:12px;padding-top:10px}.source-status{font-size:12px;color:#667085;margin-left:auto}
+  @media(max-width:980px){.az-editor{display:block;height:auto}.az-visual,.az-source{height:70vh;margin-bottom:10px}}
+</style>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h6 class="fw-bold mb-0">Xem trước & sửa trước khi lưu</h6>
-    <div class="small text-muted">
-      Nhận diện được <strong><%= questions.length %></strong> câu hỏi
-      <%= usedAI ? '(dùng AI)' : '(dò theo mẫu thông thường)' %>.
-      Bên trái là <strong>hình ảnh thật sự học viên sẽ thấy</strong>, bên phải để bạn sửa — sửa xong preview bên trái tự cập nhật ngay.
-    </div>
-  </div>
-  <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary btn-sm">Hủy, quay lại</a>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div><h5 class="mb-0">Biên tập đề theo mô hình Azota</h5><small class="text-muted">Tài nguyên công thức/hình được lưu riêng; bên phải giữ mã tham chiếu, bên trái hiển thị nội dung thật.</small></div>
+  <a href="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>" class="btn btn-outline-secondary btn-sm">Hủy</a>
 </div>
 
-<% if (aiError) { %>
-  <div class="alert alert-warning small">AI gặp lỗi (<%= aiError %>) nên hệ thống đã tự chuyển sang dò theo mẫu thông thường.</div>
-<% } %>
-<% if (questions.length === 0) { %>
-  <div class="alert alert-danger">Không nhận diện được câu hỏi nào trong file này. Vui lòng kiểm tra lại file hoặc nhập câu hỏi thủ công.</div>
-<% } %>
+<form id="examForm" method="POST" action="/admin/bai-kiem-tra/luu-de-import">
+<input type="hidden" name="redirect_to" value="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>">
+<input type="hidden" name="quiz_id" value="<%= quiz.id %>">
+<div class="az-editor">
+  <section class="az-visual" id="visualPane">
+    <% document.sections.forEach(sec => { %>
+      <div class="m-2 p-2 bg-white border rounded"><strong><%= sec.title || ('PHẦN '+sec.number) %></strong><div class="small"><%= sec.instruction %></div></div>
+      <% questions.filter(q => q.sectionNumber === sec.number).forEach((q) => { var i = questions.indexOf(q); %>
+      <article class="az-card question-row" data-index="<%= i %>">
+        <div class="az-card-head"><strong>Câu <%= q.number %></strong><div><% if(q.needsReview){ %><span class="badge bg-warning text-dark">Cần kiểm tra</span><% } %> <label class="small"><input type="checkbox" name="questions[<%= i %>][include]" checked> Giữ</label></div></div>
+        <div class="az-card-body">
+          <div class="row g-2 mb-2"><div class="col-8"><select name="questions[<%= i %>][type]" class="form-select form-select-sm q-type">
+            <option value="single_choice" <%= q.type==='single_choice'||q.type==='multiple_choice'?'selected':'' %>>Trắc nghiệm</option><option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Đúng/Sai</option><option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Trả lời ngắn</option><option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận</option>
+          </select></div><div class="col-4"><input type="number" step="0.05" class="form-control form-control-sm" name="questions[<%= i %>][points]" value="<%= q.points %>"></div></div>
+          <div class="editable q-question-edit" contenteditable="true"><%- q.question %></div>
+          <textarea hidden class="q-question-raw" name="questions[<%= i %>][question]"><%= q.rawQuestion %></textarea>
 
-<form method="POST" action="/admin/bai-kiem-tra/luu-de-import">
-  <input type="hidden" name="redirect_to" value="<%= quiz.lesson_id ? '/admin/bai-hoc/'+quiz.lesson_id+'/bai-kiem-tra' : '/admin/bai-kiem-tra/'+quiz.id+'/cau-hoi' %>">
-  <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
-
-  <% questions.forEach((q, i) => { %>
-    <div class="card p-0 mb-3 question-row overflow-hidden" data-index="<%= i %>">
-      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-white">
-        <span class="fw-bold">Câu <%= i+1 %> <%= q.needsReview ? '<span class="badge bg-warning text-dark ms-1">Cần kiểm tra lại</span>' : '' %></span>
-        <label class="small d-flex align-items-center gap-1 mb-0">
-          <input type="checkbox" name="questions[<%= i %>][include]" checked> Giữ câu này
-        </label>
-      </div>
-
-      <div class="row g-0">
-        <!-- Cot trai: xem truoc that su (tu cap nhat khi sua ben phai) -->
-        <div class="col-md-6 border-end bg-light p-3 preview-pane">
-          <div class="small text-muted mb-2"><i class="fa-solid fa-eye"></i> Xem trước</div>
-          <div class="preview-content bg-white rounded p-3 border" style="min-height:120px"></div>
+          <div class="choice-fields" style="<%= q.type==='single_choice'||q.type==='multiple_choice'?'':'display:none' %>">
+            <% q.rawOptions.forEach((opt,k)=>{ %><div class="option-edit"><input type="radio" name="questions[<%= i %>][correct_index]" value="<%= k %>" <%= q.correctIndex===k?'checked':'' %>><b><%= q.labels[k]||String.fromCharCode(65+k) %>.</b><div class="editable q-option-edit" contenteditable="true"><%- q.options[k] %></div><input type="hidden" class="q-option-raw" name="questions[<%= i %>][options][]" value="<%= opt %>"></div><% }) %>
+          </div>
+          <div class="tf-fields" style="<%= q.type==='true_false'?'':'display:none' %>">
+            <% q.rawOptions.forEach((opt,k)=>{ %><div class="option-edit"><b><%= q.labels[k]||String.fromCharCode(97+k) %>)</b><div class="editable q-tf-edit" contenteditable="true"><%- q.options[k] %></div><input type="hidden" class="q-tf-raw" name="questions[<%= i %>][tf_content][]" value="<%= opt %>"><label><input type="checkbox" name="questions[<%= i %>][tf_correct][]" value="<%= k %>" <%= q.items[k]&&q.items[k].is_correct?'checked':'' %>> Đúng</label></div><% }) %>
+          </div>
+          <div class="short-fields" style="<%= q.type==='short_answer'?'':'display:none' %>"><input class="form-control form-control-sm" name="questions[<%= i %>][correct_answer]" value="<%= q.correct_answer %>" placeholder="Đáp án"></div>
+          <div class="solution-box"><small class="text-warning-emphasis fw-bold">HƯỚNG DẪN GIẢI</small><div class="editable q-solution-edit mt-1" contenteditable="true"><%- q.explanation || '' %></div><textarea hidden class="q-solution-raw" name="questions[<%= i %>][explanation]"><%= q.rawSolution || '' %></textarea></div>
         </div>
-
-        <!-- Cot phai: cac o de sua -->
-        <div class="col-md-6 p-3">
-          <div class="row g-2 mb-2">
-            <div class="col-md-8">
-              <label class="form-label small">Dạng câu hỏi</label>
-              <select name="questions[<%= i %>][type]" class="form-select form-select-sm q-type">
-                <option value="single_choice" <%= q.type==='single_choice'?'selected':'' %>>Phần I — Trắc nghiệm nhiều lựa chọn</option>
-                <option value="true_false" <%= q.type==='true_false'?'selected':'' %>>Phần II — Đúng/Sai (4 ý)</option>
-                <option value="short_answer" <%= q.type==='short_answer'?'selected':'' %>>Phần III — Trả lời ngắn</option>
-                <option value="essay" <%= q.type==='essay'?'selected':'' %>>Tự luận (chấm tay)</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small">Điểm</label>
-              <input type="number" step="0.05" name="questions[<%= i %>][points]" class="form-control form-control-sm q-points" value="<%= q.points %>">
-            </div>
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label small">Nội dung câu hỏi <span class="text-muted">(có thể chứa thẻ &lt;img&gt;/&lt;math&gt; — cứ để nguyên, đừng xóa)</span></label>
-            <textarea name="questions[<%= i %>][question]" class="form-control form-control-sm q-question" rows="3"><%= q.question %></textarea>
-          </div>
-
-          <!-- Trac nghiem 1 dap an -->
-          <div class="q-fields" data-type="single_choice" style="<%= q.type!=='single_choice'?'display:none':'' %>">
-            <% for (let k = 0; k < 4; k++) { %>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <input type="radio" name="questions[<%= i %>][correct_index]" value="<%= k %>" class="q-correct-index" <%= (q.correctIndex===k)?'checked':(k===0 && q.correctIndex===undefined?'checked':'') %>>
-                <input name="questions[<%= i %>][options][]" class="form-control form-control-sm q-option" value="<%= (q.options && q.options[k]) ? q.options[k] : '' %>" placeholder="Phương án <%= String.fromCharCode(65+k) %>">
-              </div>
-            <% } %>
-          </div>
-
-          <!-- Dung/Sai -->
-          <div class="q-fields" data-type="true_false" style="<%= q.type!=='true_false'?'display:none':'' %>">
-            <% for (let k = 0; k < 4; k++) { %>
-              <% var item = (q.items && q.items[k]) ? q.items[k] : { content: '', is_correct: false }; %>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="text-muted" style="width:16px"><%= String.fromCharCode(97+k) %>)</span>
-                <input name="questions[<%= i %>][tf_content][]" class="form-control form-control-sm q-tf-content" value="<%= item.content %>">
-                <label class="d-flex align-items-center gap-1 small mb-0">
-                  <input type="checkbox" name="questions[<%= i %>][tf_correct][]" value="<%= k %>" class="q-tf-correct" <%= item.is_correct ? 'checked' : '' %>> Đúng
-                </label>
-              </div>
-            <% } %>
-          </div>
-
-          <!-- Tra loi ngan -->
-          <div class="q-fields" data-type="short_answer" style="<%= q.type!=='short_answer'?'display:none':'' %>">
-            <input name="questions[<%= i %>][correct_answer]" class="form-control form-control-sm q-correct-answer" value="<%= q.correct_answer || '' %>" placeholder="Đáp án đúng">
-          </div>
-
-          <!-- Tu luan: khong can them field -->
-        </div>
-      </div>
-    </div>
-  <% }) %>
-
-  <% if (questions.length > 0) { %>
-    <button class="btn btn-primary">Lưu tất cả câu hỏi đã chọn vào bài kiểm tra</button>
-  <% } %>
+      </article>
+      <% }) %>
+    <% }) %>
+  </section>
+  <aside class="az-source">
+    <div class="az-toolbar"><button type="button" class="btn btn-sm btn-outline-primary" id="applySource">Áp dụng nội dung</button><button type="button" class="btn btn-sm btn-outline-secondary" id="goQuestion">Đi đến câu</button><input id="goNumber" type="number" min="1" class="form-control form-control-sm" style="width:72px"><span class="source-status" id="sourceStatus">Có <%= Object.keys(document.assets.maths).length %> công thức, <%= Object.keys(document.assets.images).length %> hình</span></div>
+    <textarea id="sourceEditor" spellcheck="false"><%= document.rawText %></textarea>
+  </aside>
+</div>
+<div class="mt-2"><button class="btn btn-primary">Lưu các câu đã chọn</button></div>
 </form>
 
-<script>window.MathJax = { tex: { inlineMath: [['$','$']] }, startup: { typeset: false } };</script>
-<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
+<script type="application/json" id="assetData"><%- JSON.stringify(document.assets).replace(/</g,'\\u003c') %></script>
 <script>
-  const letters = ['A', 'B', 'C', 'D'];
-
-  function renderPreview(row) {
-    const type = row.querySelector('.q-type').value;
-    const questionHtml = row.querySelector('.q-question').value;
-    const previewEl = row.querySelector('.preview-content');
-    let html = `<div class="mb-2">${questionHtml}</div>`;
-
-    if (type === 'single_choice') {
-      const correctIdx = row.querySelector('.q-correct-index:checked') ? parseInt(row.querySelector('.q-correct-index:checked').value) : -1;
-      const opts = [...row.querySelectorAll('.q-option')].map(el => el.value);
-      html += '<div class="d-flex flex-column gap-1">';
-      opts.forEach((opt, k) => {
-        const isCorrect = k === correctIdx;
-        html += `<div class="${isCorrect ? 'text-success fw-bold' : ''}">${isCorrect ? '✓' : letters[k] + '.'} ${opt}</div>`;
-      });
-      html += '</div>';
-    } else if (type === 'true_false') {
-      const contents = [...row.querySelectorAll('.q-tf-content')].map(el => el.value);
-      const corrects = [...row.querySelectorAll('.q-tf-correct')].map(el => el.checked);
-      html += '<div class="d-flex flex-column gap-1">';
-      contents.forEach((c, k) => {
-        html += `<div>${String.fromCharCode(97+k)}) ${c} — <span class="${corrects[k] ? 'text-success fw-bold' : 'text-danger'}">${corrects[k] ? 'Đúng' : 'Sai'}</span></div>`;
-      });
-      html += '</div>';
-    } else if (type === 'short_answer') {
-      const ans = row.querySelector('.q-correct-answer').value;
-      html += `<div class="small">Đáp án đúng: <strong class="text-success">${ans}</strong></div>`;
-    } else {
-      html += '<div class="small text-muted">Câu tự luận — học viên nhập bài làm dài, giáo viên chấm tay sau.</div>';
-    }
-
-    previewEl.innerHTML = html;
-    if (window.MathJax && window.MathJax.typesetPromise) {
-      window.MathJax.typesetPromise([previewEl]).catch(() => {});
-    }
-  }
-
-  document.querySelectorAll('.question-row').forEach(row => {
-    const select = row.querySelector('.q-type');
-    select.addEventListener('change', () => {
-      row.querySelectorAll('.q-fields').forEach(el => {
-        el.style.display = el.dataset.type === select.value ? '' : 'none';
-      });
-      renderPreview(row);
-    });
-    row.querySelectorAll('input, textarea').forEach(el => {
-      el.addEventListener('input', () => renderPreview(row));
-      el.addEventListener('change', () => renderPreview(row));
-    });
-    renderPreview(row);
-  });
+const assets=JSON.parse(document.getElementById('assetData').textContent);
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function renderRefs(raw){let s=esc(raw).replace(/\n/g,'<br>');s=s.replace(/\[!m:\$([^$\]]+)\$\]/g,(_,id)=>{const a=assets.maths[id];if(!a)return '<span class="exam-missing-asset">[⚠ công thức]</span>';if(a.mathml)return '<span class="exam-math">'+a.mathml+'</span>';return '<img class="exam-math-img" src="'+a.dataUrl+'">'});s=s.replace(/\[img:\$([^$\]]+)\$\]/g,(_,id)=>{const a=assets.images[id];return a?'<img class="exam-content-img" src="'+a.dataUrl+'">':'<span class="exam-missing-asset">[⚠ hình]</span>'});return s}
+function bindType(row){const sel=row.querySelector('.q-type');function update(){row.querySelector('.choice-fields').style.display=sel.value==='single_choice'?'':'none';row.querySelector('.tf-fields').style.display=sel.value==='true_false'?'':'none';row.querySelector('.short-fields').style.display=sel.value==='short_answer'?'':'none'}sel.addEventListener('change',update);update()}
+document.querySelectorAll('.question-row').forEach(bindType);
+document.getElementById('goQuestion').addEventListener('click',()=>{const n=document.getElementById('goNumber').value;const card=[...document.querySelectorAll('.az-card')].find(x=>x.querySelector('.az-card-head strong').textContent.trim()==='Câu '+n);if(card)card.scrollIntoView({behavior:'smooth',block:'start'})});
+// Parser nhẹ phía trình duyệt để sửa nguồn bên phải rồi cập nhật câu/phương án bên trái.
+document.getElementById('applySource').addEventListener('click',()=>{const src=document.getElementById('sourceEditor').value;const parts=src.split(/\n(?=(?:Câu|Bài|Question)\s*\d+\s*[.:)])/i);let changed=0;for(const part of parts){const m=part.match(/^(?:Câu|Bài|Question)\s*(\d+)\s*[.:)]\s*([\s\S]*)/i);if(!m)continue;const n=Number(m[1]);const card=[...document.querySelectorAll('.az-card')].find(x=>x.querySelector('.az-card-head strong').textContent.trim()==='Câu '+n);if(!card)continue;const body=m[2];const marks=[...body.matchAll(/(?:^|\n|\t| {2,})([A-H])\s*[.)]\s*/g)];let stem=body,opts=[];if(marks.length>=2){stem=body.slice(0,marks[0].index).trim();opts=marks.map((x,i)=>body.slice(x.index+x[0].length,marks[i+1]?marks[i+1].index:body.length).trim())}card.querySelector('.q-question-raw').value=stem;card.querySelector('.q-question-edit').innerHTML=renderRefs(stem);card.querySelectorAll('.q-option-raw').forEach((el,i)=>{if(opts[i]!=null){el.value=opts[i];card.querySelectorAll('.q-option-edit')[i].innerHTML=renderRefs(opts[i])}});changed++}document.getElementById('sourceStatus').textContent='Đã cập nhật '+changed+' câu';});
+// Trước khi submit: chuyển phần hiển thị đã sửa thành HTML lưu vào DB; raw placeholder vẫn nằm ở editor nguồn.
+document.getElementById('examForm').addEventListener('submit',()=>{document.querySelectorAll('.question-row').forEach(row=>{const q=row.querySelector('.q-question-raw');q.value=row.querySelector('.q-question-edit').innerHTML;row.querySelectorAll('.q-option-raw').forEach((el,i)=>el.value=row.querySelectorAll('.q-option-edit')[i].innerHTML);row.querySelectorAll('.q-tf-raw').forEach((el,i)=>el.value=row.querySelectorAll('.q-tf-edit')[i].innerHTML);row.querySelector('.q-solution-raw').value=row.querySelector('.q-solution-edit').innerHTML})});
 </script>
-
 <%- include('../../partials/admin-footer') %>

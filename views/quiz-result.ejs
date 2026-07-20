@@ -1,5 +1,6 @@
 <% var pageTitle = 'Kết quả bài kiểm tra' %>
 <%- include('partials/header') %>
+<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <div class="row justify-content-center">
   <div class="col-lg-8">
@@ -21,6 +22,12 @@
       <% result.details.forEach((d, i) => { %>
         <div class="mb-2 p-2 rounded bg-light">
           <div><strong>Câu <%= i+1 %> (<%= d.earned %>/<%= d.maxPoints %>đ):</strong> <%- d.question %></div>
+          <% if (d.explanation) { %>
+            <div class="mt-2 p-2 rounded small" style="background:#fff8e6; border:1px solid #ffe6a3">
+              <div class="fw-bold text-warning-emphasis mb-1"><i class="fa-solid fa-lightbulb"></i> Lời giải chi tiết</div>
+              <div><%- d.explanation %></div>
+            </div>
+          <% } %>
 
           <% if (d.type === 'single_choice') { %>
             <div class="small <%= d.isCorrect ? 'text-success' : 'text-danger' %>"><%= d.isCorrect ? '✓ Đúng' : '✗ Chưa đúng' %></div>
@@ -40,7 +47,9 @@
             <div class="small <%= d.isCorrect ? 'text-success' : 'text-danger' %>"><%= d.isCorrect ? '✓ Đúng' : '✗ Chưa đúng' %></div>
 
           <% } else if (d.type === 'essay') { %>
-            <div class="small text-warning">Câu tự luận — đang chờ giáo viên chấm tay</div>
+            <div class="small text-warning mb-2">Câu tự luận — đang chờ giáo viên chấm tay</div>
+            <div class="essay-answer-render" id="resultEssay<%= i %>"></div>
+            <script type="application/json" id="resultEssayJson<%= i %>"><%- JSON.stringify(d.yourAnswer || '').replace(/</g, '\\u003c') %></script>
           <% } %>
         </div>
       <% }) %>
@@ -49,5 +58,17 @@
 </div>
 
 <script>window.MathJax = { tex: { inlineMath: [['$','$']] } };</script>
-<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
+<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="/js/math-essay-editor.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('[id^="resultEssay"]:not([type])').forEach(function (el) {
+    if (!el.classList.contains('essay-answer-render')) return;
+    const i = el.id.replace('resultEssay','');
+    const holder = document.getElementById('resultEssayJson'+i);
+    let raw=''; try { raw=JSON.parse(holder.textContent); } catch(e) { raw=holder.textContent; }
+    window.MathEssayEditor.renderAnswer(el, raw);
+  });
+});
+</script>
 <%- include('partials/footer') %>

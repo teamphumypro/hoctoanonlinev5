@@ -1,5 +1,6 @@
 <% var pageTitle = quiz.title %>
 <%- include('partials/header') %>
+<link rel="stylesheet" href="/css/math-essay-editor.css">
 
 <div class="row justify-content-center">
   <div class="col-lg-8">
@@ -65,12 +66,16 @@
                 <input name="answers[<%= q.id %>]" class="form-control" style="max-width:300px" placeholder="Nhập đáp án">
 
               <% } else if (q.type === 'essay') { %>
-                <textarea name="essay[<%= q.id %>]" class="form-control" rows="8" placeholder="Viết bài làm của bạn tại đây..."></textarea>
+                <div class="alert alert-light border small mb-2">
+                  <strong>Làm trực tiếp trên máy:</strong> bạn có thể kết hợp văn bản, công thức toán, viết/vẽ tay và ảnh bài làm trong cùng một câu.
+                </div>
+                <input type="hidden" name="essay[<%= q.id %>]" id="essayData<%= q.id %>" value="">
+                <div class="math-essay-editor" data-target="essayData<%= q.id %>" data-storage-key="quiz-<%= quiz.id %>-question-<%= q.id %>"></div>
               <% } %>
             </div>
           <% }) %>
 
-          <button class="btn btn-primary">Nộp bài</button>
+          <button class="btn btn-primary" type="submit">Nộp bài</button>
         </form>
       <% } %>
     </div>
@@ -92,6 +97,7 @@
       display.textContent = '00:00';
       if (!autoSubmitted && form) {
         autoSubmitted = true;
+        window.MathEssayEditor?.syncAll();
         alert('Đã hết thời gian làm bài, hệ thống sẽ tự động nộp bài.');
         form.submit();
       }
@@ -106,6 +112,8 @@
 </script>
 <% } %>
 
-<script>window.MathJax = { tex: { inlineMath: [['$','$']] } };</script>
+<script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']] } };</script>
+<script src="/js/math-essay-editor.js"></script>
+<script>document.getElementById('quizForm')?.addEventListener('submit',()=>window.MathEssayEditor?.syncAll());</script>
 <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
 <%- include('partials/footer') %>

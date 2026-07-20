@@ -14,6 +14,8 @@ Mỗi phần tử trong mảng là 1 câu hỏi theo đúng 1 trong 4 dạng sau
 Quy tắc quan trọng:
 - Nếu văn bản có công thức Toán/Lý/Hóa bị lỗi ký tự do không đọc được từ file gốc, hãy cố suy luận lại nội dung hợp lý nhất có thể dựa trên ngữ cảnh, và nếu không chắc chắn, giữ nguyên phần chữ đọc được, không tự bịa số liệu.
 - Nếu trong văn bản có các token dạng [[IMG:0]], [[IMG:1]]... (đại diện cho hình ảnh/công thức được nhúng trong file gốc), PHẢI giữ nguyên y hệt các token này ở đúng vị trí trong câu hỏi/phương án tương ứng, không được xóa, đổi số, hay diễn giải nội dung của chúng.
+- Một số đề ghi đáp án NGAY SAU mỗi câu hỏi theo dạng "Đáp án: ..." hoặc "Đáp số: ..." (khác với đề có 1 bảng đáp án gộp chung ở cuối bài). Với dạng này: PHẢI đọc đúng giá trị đáp án đó và gán vào correctIndex (nếu là 1 chữ cái A/B/C/D) hoặc correct_answer (nếu là số/chữ tự do, dùng dạng "short_answer"). TUYỆT ĐỐI KHÔNG đưa dòng "Đáp án: ..." đó vào trong nội dung câu hỏi (question) — phải loại bỏ nó ra khỏi phần đề bài mà học viên nhìn thấy.
+- Nếu sau đáp án có phần "HƯỚNG DẪN GIẢI" / "LỜI GIẢI" (lời giải chi tiết từng bước), TUYỆT ĐỐI KHÔNG đưa phần lời giải đó vào nội dung câu hỏi — chỉ giữ lại đúng phần đề bài, bỏ hết lời giải.
 - Nếu tìm thấy đáp án đúng trong đề (ghi rõ hoặc có bảng đáp án), hãy gán correctIndex/is_correct/correct_answer tương ứng. Nếu KHÔNG chắc chắn đáp án đúng, vẫn tạo câu hỏi bình thường nhưng chọn correctIndex là -1 (nghĩa là chưa xác định, để người dùng tự chọn lại).
 - Giữ nguyên số thứ tự và nội dung câu hỏi càng sát bản gốc càng tốt.
 - Chỉ trả về mảng JSON, không thêm bất kỳ chữ nào khác.`;

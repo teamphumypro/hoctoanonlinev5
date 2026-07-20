@@ -61,11 +61,19 @@ async function extractFromExcel(filePath) {
   return lines.join('\n');
 }
 
-// Doc chu trong anh bang OCR (Tesseract, mien phi, chay ngay tren server, ho tro tieng Viet).
+// Doc chu trong anh bang OCR (Tesseract, mien phi, ho tro tieng Viet).
 // Luu y: do chinh xac THAP HON nhieu so voi doc file docx/pdf that su, dac biet voi cong thuc Toan/Ly/Hoa
 // va anh chup nghieng/mo/thieu sang - chi nen dung khi khong co san file goc.
+// (Tam thoi go bo goi tesseract.js khoi package.json vi qua nang, gay loi "npm install" tren goi Render
+// Free - neu ban muon bat lai tinh nang doc anh, them lai "tesseract.js" vao package.json va can nang cap
+// goi Render du tai nguyen build.)
 async function extractFromImage(filePath) {
-  const Tesseract = require('tesseract.js');
+  let Tesseract;
+  try {
+    Tesseract = require('tesseract.js');
+  } catch (e) {
+    throw new Error('Tính năng đọc ảnh (OCR) hiện chưa được bật trên server này. Vui lòng dùng file .docx/.pdf/.xlsx thay thế.');
+  }
   const { data } = await Tesseract.recognize(filePath, 'vie+eng');
   return data.text;
 }
