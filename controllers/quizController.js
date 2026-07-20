@@ -25,25 +25,6 @@ exports.take = async (req, res) => {
   let quizStart = null;
   if (quiz.time_limit_minutes) quizStart = await Quiz.getOrCreateStart(quiz.id, req.session.user.id);
 
-  // De dang PDF sach lat (import theo cach moi): hien flipbook + bang tra loi dong bo theo trang,
-  // thay vi render toan bo noi dung cau server-side nhu truoc.
-  if (quiz.pdf_source_path) {
-    // QUAN TRONG: JSON nay se duoc nhung thang vao trang (client can de dung bang tra loi dong theo
-    // trang) - PHAI loc bo moi truong chua dap an dung truoc khi gui, neu khong hoc sinh co the xem
-    // View Source la thay dap an. Khac voi view cu (render server-side, khong bao gio lo).
-    const clientQuestions = questions.map((q, qi) => ({
-      id: q.id,
-      displayNumber: qi + 1,
-      type: q.type,
-      points: q.points,
-      page_number: q.page_number,
-      optionCount: q.type === 'single_choice' ? (q.options || []).length : (q.type === 'true_false' ? (q.tfItems || []).length : 0),
-      options: q.type === 'single_choice' ? (q.options || []).map(o => ({ id: o.id })) : undefined,
-      tfItems: q.type === 'true_false' ? (q.tfItems || []).map(it => ({ id: it.id })) : undefined
-    }));
-    return res.render('quiz-take-pdf', { quiz, questions: clientQuestions, bestAttempt, totalPoints: Quiz.totalPoints(questions), quizStart });
-  }
-
   res.render('quiz-take', { quiz, questions, bestAttempt, totalPoints: Quiz.totalPoints(questions), quizStart });
 };
 
@@ -112,4 +93,47 @@ exports.leaderboard = async (req, res) => {
 exports.myAssignments = async (req, res) => {
   const assignments = await Quiz.myAssignments(req.session.user.id);
   res.render('student/my-assignments', { assignments });
+};
+
+
+// Trả file PDF gốc của đề thi từ database để học sinh xem trực tiếp.
+exports.pdfDocument = async (req, res) => {
+  const quiz = await Quiz.findById(req.params.id);
+  if (!quiz || !quiz.pdf_exam_mode) return res.status(404).end();
+  const doc = await Quiz.getPdfDocument(quiz.id);
+  if (!doc || !doc.pdf_data) return res.status(404).end();
+
+  const buffer = Buffer.isBuffer(doc.pdf_data) ? doc.pdf_data : Buffer.from(doc.pdf_data);
+  const total = buffer.length;
+  const filename = String(doc.filename || 'de-thi.pdf').replace(/["\r\n]/g, '');
+  res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  // Trình xem PDF của Chrome/Edge thường tải từng đoạn (HTTP Range).
+  // Nếu server không trả 206, iframe có thể chỉ hiện trang trắng.
+  const range = req.headers.range;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (!match) {
+      res.status(416).setHeader('Content-Range', `bytes */${total}`);
+      return res.end();
+    }
+    const start = match[1] ? Number(match[1]) : 0;
+    const requestedEnd = match[2] ? Number(match[2]) : total - 1;
+    const end = Math.min(requestedEnd, total - 1);
+    if (!Number.isFinite(start) || start < 0 || start > end || start >= total) {
+      res.status(416).setHeader('Content-Range', `bytes */${total}`);
+      return res.end();
+    }
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+    res.setHeader('Content-Length', end - start + 1);
+    return res.end(buffer.subarray(start, end + 1));
+  }
+
+  res.setHeader('Content-Length', total);
+  return res.end(buffer);
 };

@@ -22,6 +22,7 @@ router.post('/kich-hoat', requireLogin, studentController.redeem);
 
 router.get('/hoc/:id', studentController.watchLesson); // co the la bai preview => khong bat buoc dang nhap
 
+router.get('/thi/:id/de.pdf', requireLogin, quizController.pdfDocument);
 router.get('/thi/:id', requireLogin, quizController.take);
 router.post('/thi/:id/nop-bai', requireLogin, quizController.submit);
 router.get('/thi/:id/xep-hang', requireLogin, quizController.leaderboard);

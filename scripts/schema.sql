@@ -513,10 +513,18 @@ CREATE TABLE IF NOT EXISTS online_book_categories (
 );
 ALTER TABLE online_books ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES online_book_categories(id) ON DELETE SET NULL;
 
--- ---------- BO SUNG: "Thuc chien phong thi" kieu PDF sach lat (thay the hoan toan cach import
--- doc-hieu-tach-noi-dung cu). De thi hien thi bang chinh trang PDF goc qua pdf.js o trinh duyet -
--- khong con luu lai noi dung/cong thuc duoi dang van ban tai tao, chi luu metadata nhe (trang nao
--- ung voi cau nao, dap an dung la gi) de cham diem, giong het co che dang dung cho quiz_questions. ----------
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_source_path TEXT;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_total_pages INTEGER;
-ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS page_number INTEGER;
+
+-- ---------- CHE DO DE PDF + BAI LAM BEN CANH ----------
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_exam_mode INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_page_count INTEGER;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pdf_question_map JSONB;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS source_page INTEGER;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS display_number TEXT;
+
+CREATE TABLE IF NOT EXISTS quiz_pdf_documents (
+  quiz_id INTEGER PRIMARY KEY REFERENCES quizzes(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+  pdf_data BYTEA NOT NULL,
+  uploaded_at TIMESTAMPTZ DEFAULT now()
+);
