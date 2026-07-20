@@ -22,7 +22,7 @@ async function extractFromDocx(filePath) {
     convertImage: mammoth.images.imgElement(async (image) => {
       const b64 = await image.read('base64');
       const idx = images.length;
-      images.push({ src: `data:${image.contentType};base64,${b64}`, kind: 'image' });
+      images.push(`data:${image.contentType};base64,${b64}`);
       return { src: `__IMGPLACEHOLDER_${idx}__` };
     })
   });
@@ -39,9 +39,58 @@ async function extractFromDocx(filePath) {
 async function extractFromPdf(filePath) {
   const pdfParse = require('pdf-parse');
   const buffer = fs.readFileSync(filePath);
-  const data = await pdfParse(buffer);
-  // Luu y: chi doc duoc PDF co chu thuc (van ban), KHONG doc duoc PDF dang anh scan
-  return data.text;
+
+  // Truoc day ham nay chi lay chu (pdf-parse), lam mat toan bo anh/hinh minh hoa nhung trong PDF.
+  // Gio trich them anh JPEG nhung (neu co) va gan xap xi vao dung trang - xem gioi han chi tiet
+  // va ly do khong dung thu vien PDF-render ngoai (khong co mang de cai) trong pdfImageExtractor.js.
+  let images = [];
+  let pageImageMap = {};
+  try {
+    const { extractPdfImages } = require('./pdfImageExtractor');
+    const extracted = extractPdfImages(buffer);
+    images = extracted.images;
+    pageImageMap = extracted.pageImageMap;
+  } catch (err) {
+    console.error('Khong trich xuat duoc anh nhung trong PDF (bo qua, chi giu van ban):', err.message);
+  }
+
+  const pageTexts = [];
+  let data;
+  try {
+    data = await pdfParse(buffer, {
+      pagerender: (pageData) => pageData.getTextContent().then((textContent) => {
+        let lastY, text = '';
+        for (const item of textContent.items) {
+          if (lastY === item.transform[5] || !lastY) text += item.str;
+          else text += '\n' + item.str;
+          lastY = item.transform[5];
+        }
+        pageTexts.push(text);
+        return text;
+      })
+    });
+  } catch (err) {
+    // Neu vi ly do gi pagerender loi (vd file la, phien ban PDF khac thuong), quay ve doc chu
+    // binh thuong nhu truoc day - khong lam vo tinh nang doc PDF dang chay on dinh.
+    data = await pdfParse(buffer);
+    return { text: data.text, images };
+  }
+
+  if (pageTexts.length === 0) {
+    // pagerender khong sinh duoc trang nao (hiem, vd PDF 0 trang chu) -> dung ket qua mac dinh cua pdf-parse
+    return { text: data.text || '', images };
+  }
+
+  // Noi van ban tung trang lai va chen [[IMG:n]] cua dung trang do ngay sau noi dung trang
+  // (xap xi theo trang, khong phai dung vi tri inline nhu DOCX - xem ghi chu trong pdfImageExtractor.js)
+  let text = '';
+  pageTexts.forEach((pageText, idx) => {
+    text += pageText.trim();
+    (pageImageMap[idx] || []).forEach((imgIdx) => { text += `\n[[IMG:${imgIdx}]]`; });
+    text += '\n\n';
+  });
+
+  return { text: text.trim(), images };
 }
 
 // Doc file Excel: gom het noi dung cac o theo tung dong, moi dong 1 dong van ban,
@@ -81,7 +130,7 @@ async function extractFromImage(filePath) {
 async function extractText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.docx') return extractFromDocx(filePath); // { text, images }
-  if (ext === '.pdf') return { text: await extractFromPdf(filePath), images: [] };
+  if (ext === '.pdf') return extractFromPdf(filePath); // { text, images } - xem ghi chu trong extractFromPdf
   if (ext === '.xlsx' || ext === '.xls') return { text: await extractFromExcel(filePath), images: [] };
   if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) return { text: await extractFromImage(filePath), images: [] };
   throw new Error('Chỉ hỗ trợ file .docx, .pdf, .xlsx hoặc ảnh (.jpg/.png)');
@@ -91,15 +140,8 @@ async function extractText(filePath) {
 function restoreImages(text, images) {
   if (!text) return text;
   return text.replace(/\[\[IMG:(\d+)\]\]/g, (m, idx) => {
-    const asset = images[parseInt(idx)];
-    if (!asset) return '';
-    const src = typeof asset === 'string' ? asset : asset.src;
-    const kind = typeof asset === 'string' ? 'image' : (asset.kind || 'image');
-    if (!src) return '';
-    if (kind === 'math') {
-      return `<img src="${src}" data-exam-asset="math" alt="công thức" style="display:inline-block!important;vertical-align:middle!important;width:auto!important;height:auto!important;max-height:1.7em!important;max-width:min(100%,22em)!important;object-fit:contain!important;margin:0 .12em!important;line-height:1!important">`;
-    }
-    return `<img src="${src}" data-exam-asset="image" alt="hình minh họa" style="display:block!important;width:auto!important;height:auto!important;max-width:100%!important;max-height:520px!important;object-fit:contain!important;margin:8px auto!important">`;
+    const src = images[parseInt(idx)];
+    return src ? `<img src="${src}" style="max-width:100%;display:block;margin:6px 0">` : '';
   });
 }
 

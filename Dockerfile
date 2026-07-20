@@ -1,8 +1,11 @@
-# Dockerfile nay GIO LA TUY CHON, khong bat buoc nua — he thong da chuyen sang dung thu vien
-# JS thuan (emf-converter + @napi-rs/canvas) de doc cong thuc dang WMF/EMF, khong can LibreOffice
-# nua trong da so truong hop. Dockerfile nay chi con dung lam PHUONG AN DU PHONG cho nhung file WMF
-# hiem gap ma thu vien JS chua xu ly duoc — neu ban van dang deploy kieu Node binh thuong (khong
-# dung Dockerfile nay), moi thu van hoat dong binh thuong.
+# QUAN TRONG: LibreOffice o day GIO LA DUONG CHINH (khong con la tuy chon) de chuyen doi cong
+# thuc MathType dang WMF/EMF sang PNG dung noi dung (bao gom ca chu so/ky hieu, khong chi net ve).
+# Thu vien JS thuan (emf-converter) tung duoc uu tien nhung gay loi thuc te: no ve duoc net vector
+# nhung bo qua record van ban trong WMF, ra anh cong thuc chi con net rac, mat het noi dung -
+# xem FIX-CONG-THUC-WMF-V2.md. Neu KHONG dung Dockerfile nay (deploy Node thuong, khong Docker),
+# he thong se tu dong quay ve dung thu vien JS thuan (chat luong kem hon, xem ghi chu trong
+# services/examImport/docxRichExtractor.js) - van chay duoc nhung cong thuc WMF/EMF co the bi loi
+# hien thi.
 FROM node:20-slim
 
 # Cai dat LibreOffice (chi phan can, khong cai full bo Office de do nang) de chuyen doi WMF -> PNG

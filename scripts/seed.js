@@ -1,7 +1,4 @@
-try { require('dotenv').config(); } catch (err) {
-  if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
-  console.warn('[env] dotenv not installed; using Render/system environment variables.');
-}
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const slugify = require('slugify');
 const db = require('../config/db');

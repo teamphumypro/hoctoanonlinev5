@@ -22,9 +22,11 @@ const uploadAvatar = multer({ storage: makeStorage('avatars'), limits: { fileSiz
 const uploadThumbnail = multer({ storage: makeStorage('thumbnails'), limits: { fileSize: 5 * 1024 * 1024 } });
 const uploadVideo = multer({ storage: makeStorage('videos'), limits: { fileSize: 500 * 1024 * 1024 } });
 const uploadFile = multer({ storage: makeStorage('files'), limits: { fileSize: 50 * 1024 * 1024 } });
+// File PDF de thi kieu "sach lat" (thay the hoan toan cach upload Word/PDF doc-hieu-tach-noi-dung
+// cu) - chi nhan PDF, gioi han rong hon vi de thi that co the nhieu trang/co anh.
 const uploadExamDoc = multer({
   storage: makeStorage('exam-imports'),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 60 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = /\.pdf$/i.test(file.originalname);
     cb(null, ok);

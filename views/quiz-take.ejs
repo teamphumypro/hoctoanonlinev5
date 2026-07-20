@@ -1,67 +1,111 @@
 <% var pageTitle = quiz.title %>
 <%- include('partials/header') %>
 
-<% if (quiz.pdf_exam_mode) { %>
-<style>
-  body{overflow:hidden}.pdf-exam-shell{height:calc(100vh - 68px);display:grid;grid-template-columns:minmax(0,1.65fr) minmax(360px,.75fr);background:#edf0f5}
-  .exam-paper{min-width:0;display:flex;flex-direction:column;border-right:1px solid #d8dde6}.exam-answer{min-width:0;background:#fff;display:flex;flex-direction:column}
-  .exam-bar{height:52px;background:#fff;border-bottom:1px solid #dfe3ea;display:flex;align-items:center;gap:8px;padding:8px 12px}.exam-paper-body{flex:1;overflow:auto;text-align:center;padding:14px}.exam-paper-body canvas{background:#fff;max-width:100%;box-shadow:0 4px 18px #0002}
-  .answer-head{padding:12px 14px;border-bottom:1px solid #e2e6ed}.question-nav{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #e2e6ed;max-height:116px;overflow:auto}.qnav{width:34px;height:34px;border:1px solid #cfd6e2;background:#fff;border-radius:7px}.qnav.active{background:#1759c7;color:#fff;border-color:#1759c7}.qnav.answered{box-shadow:inset 0 -4px #2cab65}
-  .answer-body{flex:1;overflow:auto;padding:16px}.question-card{display:none}.question-card.active{display:block}.option-button{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #dce2eb;border-radius:10px;margin-bottom:9px;cursor:pointer}.option-button:has(input:checked){border-color:#1759c7;background:#eef4ff}.option-letter{width:32px;height:32px;border-radius:8px;background:#edf1f6;display:grid;place-items:center;font-weight:700}
-  .exam-actions{padding:10px 14px;border-top:1px solid #e2e6ed;display:flex;gap:8px}.mobile-tabs{display:none}
-  @media(max-width:900px){body{overflow:auto}.pdf-exam-shell{height:calc(100vh - 68px);display:block}.mobile-tabs{display:flex;position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #ddd}.mobile-tabs button{flex:1;padding:11px;border:0;background:#fff;font-weight:700}.mobile-tabs button.active{color:#1759c7;border-bottom:3px solid #1759c7}.exam-paper,.exam-answer{height:calc(100vh - 112px);border:0}.mobile-hidden{display:none!important}.question-nav{max-height:90px}}
-</style>
-<div class="mobile-tabs"><button type="button" class="active" data-tab="paper">Đề thi</button><button type="button" data-tab="answer">Bài làm</button></div>
-<div class="pdf-exam-shell">
-  <section class="exam-paper" id="paperPane">
-    <div class="exam-bar">
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="pdfPrev">←</button>
-      <strong>Trang <span id="pdfPageNum">1</span>/<%= quiz.pdf_page_count || 1 %></strong>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="pdfNext">→</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="zoomOut">−</button><span id="zoomValue" class="small">100%</span><button type="button" class="btn btn-sm btn-outline-secondary" id="zoomIn">+</button>
-      <% if (quiz.time_limit_minutes && quizStart) { %><span id="timerDisplay" class="ms-auto fw-bold text-danger">--:--</span><% } %>
-    </div>
-    <div class="exam-paper-body" id="paperBody"><canvas id="pdfCanvas"></canvas></div>
-  </section>
-  <section class="exam-answer mobile-hidden" id="answerPane">
-    <div class="answer-head"><div class="fw-bold"><%= quiz.title %></div><small class="text-muted">Chọn câu để làm. Đề sẽ tự chuyển tới đúng trang.</small></div>
-    <div class="question-nav">
-      <% questions.forEach((q,qi)=>{ %><button class="qnav <%= qi===0?'active':'' %>" type="button" data-index="<%= qi %>" data-page="<%= q.source_page || 1 %>"><%= q.display_number || qi+1 %></button><% }) %>
-    </div>
-    <form method="POST" action="/thi/<%= quiz.id %>/nop-bai" id="quizForm" style="display:flex;flex-direction:column;min-height:0;flex:1">
-      <div class="answer-body">
-      <% questions.forEach((q,qi)=>{ %>
-        <div class="question-card <%= qi===0?'active':'' %>" data-index="<%= qi %>" data-page="<%= q.source_page || 1 %>">
-          <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold mb-0">Câu <%= q.display_number || qi+1 %></h5><span class="badge text-bg-light"><%= q.points %> điểm</span></div>
-          <% if (q.type === 'single_choice') { %>
-            <% q.options.forEach((o,oi)=>{ %><label class="option-button"><input class="form-check-input answer-input" type="radio" name="answers[<%= q.id %>]" value="<%= o.id %>"><span class="option-letter"><%= o.option_text || String.fromCharCode(65+oi) %></span><span>Chọn phương án <%= o.option_text || String.fromCharCode(65+oi) %></span></label><% }) %>
-          <% } else if (q.type === 'true_false') { %>
-            <% q.tfItems.forEach((item,i)=>{ %><div class="border rounded-3 p-3 mb-2"><div class="fw-semibold mb-2"><%= String.fromCharCode(97+i) %>) <%= item.content %></div><label class="me-4"><input class="answer-input" type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="true"> Đúng</label><label><input class="answer-input" type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="false"> Sai</label></div><% }) %>
-          <% } else if (q.type === 'short_answer') { %><label class="form-label">Nhập đáp án</label><input name="answers[<%= q.id %>]" class="form-control answer-input" placeholder="Đáp án của bạn">
-          <% } else { %><label class="form-label">Bài làm</label><textarea name="essay[<%= q.id %>]" class="form-control answer-input" rows="12" placeholder="Viết bài làm tại đây..."></textarea><% } %>
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card p-4">
+      <h4 class="fw-bold mb-1"><%= quiz.title %></h4>
+      <p class="text-muted small mb-3">Tổng điểm: <%= totalPoints %> — Cần đạt tối thiểu <strong><%= quiz.pass_score %></strong> điểm.
+        <% if (quiz.is_standalone) { %> — <a href="/thi/<%= quiz.id %>/xep-hang">Xem bảng xếp hạng</a><% } %>
+      </p>
+
+      <% if (quiz.time_limit_minutes && quizStart) { %>
+        <div id="examTimer" class="alert alert-primary d-flex justify-content-between align-items-center small fw-bold" style="position:sticky; top:70px; z-index:10">
+          <span><i class="fa-solid fa-clock"></i> Thời gian còn lại</span>
+          <span id="timerDisplay" class="fs-5">--:--</span>
         </div>
-      <% }) %>
-      </div>
-      <div class="exam-actions"><button type="button" class="btn btn-outline-secondary" id="qPrev">Câu trước</button><button type="button" class="btn btn-outline-primary" id="qNext">Câu tiếp</button><button class="btn btn-success ms-auto" onclick="return confirm('Bạn chắc chắn muốn nộp bài?')">Nộp bài</button></div>
-    </form>
-  </section>
+      <% } %>
+
+      <% if (bestAttempt) { %>
+        <div class="alert alert-<%= bestAttempt.passed ? 'success' : 'warning' %> small">
+          Kết quả tốt nhất trước đó: <strong><%= bestAttempt.score %>/<%= bestAttempt.total %></strong>
+          — <%= bestAttempt.passed ? 'Đạt' : 'Chưa đạt (hoặc còn câu chưa được chấm tay)' %>. Bạn có thể làm lại để cải thiện điểm.
+        </div>
+      <% } %>
+
+      <% if (questions.length === 0) { %>
+        <p class="text-muted">Bài kiểm tra này chưa có câu hỏi.</p>
+      <% } else { %>
+        <form method="POST" action="/thi/<%= quiz.id %>/nop-bai" id="quizForm">
+
+          <% var partLabels = { single_choice: 'Phần I — Trắc nghiệm nhiều lựa chọn', true_false: 'Phần II — Trắc nghiệm Đúng/Sai', short_answer: 'Phần III — Trả lời ngắn', essay: 'Tự luận' };
+             var lastType = null; %>
+
+          <% questions.forEach((q, qi) => { %>
+            <% if (q.type !== lastType) { lastType = q.type; %>
+              <h6 class="fw-bold mt-4 mb-2 text-primary"><%= partLabels[q.type] %></h6>
+            <% } %>
+
+            <div class="mb-4">
+              <p class="fw-semibold">Câu <%= qi+1 %> (<%= q.points %>đ): <%- q.question %></p>
+
+              <% if (q.type === 'single_choice') { %>
+                <% q.options.forEach(o => { %>
+                  <div class="form-check mb-1">
+                    <input class="form-check-input" type="radio" name="answers[<%= q.id %>]" value="<%= o.id %>" id="opt<%= o.id %>">
+                    <label class="form-check-label" for="opt<%= o.id %>"><%- o.option_text %></label>
+                  </div>
+                <% }) %>
+
+              <% } else if (q.type === 'true_false') { %>
+                <table class="table table-sm">
+                  <thead><tr><th>Ý</th><th class="text-center" style="width:80px">Đúng</th><th class="text-center" style="width:80px">Sai</th></tr></thead>
+                  <tbody>
+                    <% q.tfItems.forEach((item, i) => { %>
+                      <tr>
+                        <td><%= String.fromCharCode(97+i) %>) <%- item.content %></td>
+                        <td class="text-center"><input type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="true"></td>
+                        <td class="text-center"><input type="radio" name="answers_tf[<%= q.id %>][<%= item.id %>]" value="false"></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+
+              <% } else if (q.type === 'short_answer') { %>
+                <input name="answers[<%= q.id %>]" class="form-control" style="max-width:300px" placeholder="Nhập đáp án">
+
+              <% } else if (q.type === 'essay') { %>
+                <textarea name="essay[<%= q.id %>]" class="form-control" rows="8" placeholder="Viết bài làm của bạn tại đây..."></textarea>
+              <% } %>
+            </div>
+          <% }) %>
+
+          <button class="btn btn-primary">Nộp bài</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
 </div>
-<script type="module">
-import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-const pdf=await pdfjsLib.getDocument('/thi/<%= quiz.id %>/de.pdf').promise; let pageNo=1, zoom=1;
-const canvas=document.getElementById('pdfCanvas'), body=document.getElementById('paperBody');
-async function renderPage(n){pageNo=Math.max(1,Math.min(pdf.numPages,n));document.getElementById('pdfPageNum').textContent=pageNo;const page=await pdf.getPage(pageNo);const base=page.getViewport({scale:1});const fit=Math.max(.55,Math.min(1.7,(body.clientWidth-28)/base.width));const vp=page.getViewport({scale:fit*zoom});canvas.width=vp.width;canvas.height=vp.height;await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;}
-document.getElementById('pdfPrev').onclick=()=>renderPage(pageNo-1);document.getElementById('pdfNext').onclick=()=>renderPage(pageNo+1);document.getElementById('zoomIn').onclick=()=>{zoom=Math.min(2,zoom+.15);document.getElementById('zoomValue').textContent=Math.round(zoom*100)+'%';renderPage(pageNo)};document.getElementById('zoomOut').onclick=()=>{zoom=Math.max(.55,zoom-.15);document.getElementById('zoomValue').textContent=Math.round(zoom*100)+'%';renderPage(pageNo)};renderPage(1);
-let currentQ=0;const cards=[...document.querySelectorAll('.question-card')],navs=[...document.querySelectorAll('.qnav')];
-function goQuestion(i){currentQ=Math.max(0,Math.min(cards.length-1,i));cards.forEach((x,j)=>x.classList.toggle('active',j===currentQ));navs.forEach((x,j)=>x.classList.toggle('active',j===currentQ));renderPage(Number(cards[currentQ].dataset.page)||1);if(innerWidth<=900){showTab('answer')}}
-navs.forEach((b,i)=>b.onclick=()=>goQuestion(i));document.getElementById('qPrev').onclick=()=>goQuestion(currentQ-1);document.getElementById('qNext').onclick=()=>goQuestion(currentQ+1);
-document.querySelectorAll('.answer-input').forEach(el=>el.addEventListener('change',()=>navs[currentQ].classList.add('answered')));
-function showTab(tab){document.getElementById('paperPane').classList.toggle('mobile-hidden',tab!=='paper');document.getElementById('answerPane').classList.toggle('mobile-hidden',tab!=='answer');document.querySelectorAll('.mobile-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));if(tab==='paper')setTimeout(()=>renderPage(pageNo),30)}
-document.querySelectorAll('.mobile-tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
-<% if (quiz.time_limit_minutes && quizStart) { %>const startedAt=new Date('<%= quizStart.started_at %>').getTime(),limit=<%= quiz.time_limit_minutes %>*60,display=document.getElementById('timerDisplay'),form=document.getElementById('quizForm');let sent=false;setInterval(()=>{const r=limit-Math.floor((Date.now()-startedAt)/1000);if(r<=0){display.textContent='00:00';if(!sent){sent=true;form.submit()}return}display.textContent=String(Math.floor(r/60)).padStart(2,'0')+':'+String(r%60).padStart(2,'0')},1000);<% } %>
+
+<% if (quiz.time_limit_minutes && quizStart) { %>
+<script>
+  const startedAt = new Date('<%= quizStart.started_at %>').getTime();
+  const limitSeconds = <%= quiz.time_limit_minutes %> * 60;
+  const display = document.getElementById('timerDisplay');
+  const form = document.getElementById('quizForm');
+  let autoSubmitted = false;
+
+  function tick() {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const remaining = limitSeconds - elapsed;
+    if (remaining <= 0) {
+      display.textContent = '00:00';
+      if (!autoSubmitted && form) {
+        autoSubmitted = true;
+        alert('Đã hết thời gian làm bài, hệ thống sẽ tự động nộp bài.');
+        form.submit();
+      }
+      return;
+    }
+    const m = Math.floor(remaining / 60), s = remaining % 60;
+    display.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    if (remaining <= 60) document.getElementById('examTimer').classList.replace('alert-primary','alert-danger');
+  }
+  tick();
+  setInterval(tick, 1000);
 </script>
-<% } else { %>
-<%- include('quiz-take-legacy') %>
 <% } %>
+
+<script>window.MathJax = { tex: { inlineMath: [['$','$']] } };</script>
+<script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-chtml.js"></script>
 <%- include('partials/footer') %>
