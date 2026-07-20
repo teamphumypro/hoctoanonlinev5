@@ -1,5 +1,22 @@
 <% var pageTitle = 'Xem trước & sửa đề đã tải lên' %>
 <%- include('../../partials/admin-header') %>
+<style>
+  .preview-content img[data-exam-asset="math"],
+  .preview-explanation img[data-exam-asset="math"] {
+    display:inline-block!important; vertical-align:middle!important;
+    width:auto!important; height:auto!important; max-height:1.7em!important;
+    max-width:min(100%,22em)!important; object-fit:contain!important;
+    margin:0 .12em!important;
+  }
+  .preview-content img[data-exam-asset="image"],
+  .preview-explanation img[data-exam-asset="image"] {
+    display:block!important; width:auto!important; height:auto!important;
+    max-width:100%!important; max-height:520px!important; object-fit:contain!important;
+    margin:8px auto!important;
+  }
+  .preview-content { overflow-wrap:anywhere; }
+</style>
+
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
@@ -149,6 +166,22 @@
     }
 
     previewEl.innerHTML = html;
+    previewEl.querySelectorAll('img').forEach(img => {
+      const kind = img.dataset.examAsset;
+      if (kind === 'math') {
+        img.style.setProperty('display', 'inline-block', 'important');
+        img.style.setProperty('vertical-align', 'middle', 'important');
+        img.style.setProperty('width', 'auto', 'important');
+        img.style.setProperty('height', 'auto', 'important');
+        img.style.setProperty('max-height', '1.7em', 'important');
+        img.style.setProperty('max-width', '22em', 'important');
+      } else {
+        img.style.setProperty('max-width', '100%', 'important');
+        img.style.setProperty('max-height', '520px', 'important');
+        img.style.setProperty('width', 'auto', 'important');
+        img.style.setProperty('height', 'auto', 'important');
+      }
+    });
     if (window.MathJax && window.MathJax.typesetPromise) {
       window.MathJax.typesetPromise([previewEl]).catch(() => {});
     }

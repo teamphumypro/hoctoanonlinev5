@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: hoctoanonlinev5
+    runtime: node
+    plan: free
+    buildCommand: npm run render-build
+    startCommand: npm run render-start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      - key: NPM_CONFIG_AUDIT
+        value: "false"
+      - key: NPM_CONFIG_FUND
+        value: "false"
+      - key: NPM_CONFIG_UPDATE_NOTIFIER
+        value: "false"

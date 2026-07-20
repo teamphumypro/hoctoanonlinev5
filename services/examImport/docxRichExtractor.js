@@ -92,7 +92,7 @@ async function extractDocxRich(filePath) {
       const converted = wmfConvertedMap[imgPath];
       if (converted) {
         const idx = images.length;
-        images.push(`data:image/png;base64,${converted}`);
+        images.push({ src: `data:image/png;base64,${converted}`, kind: 'math' });
         text += `[[IMG:${idx}]]`;
       } else {
         // Khong co LibreOffice tren server -> khong the hien anh, chen chu bao ro thay vi mat trang im lang
@@ -106,7 +106,7 @@ async function extractDocxRich(filePath) {
     const b64 = await imgFile.async('base64');
     const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : 'image/png';
     const idx = images.length;
-    images.push(`data:${mime};base64,${b64}`);
+    images.push({ src: `data:${mime};base64,${b64}`, kind: 'image' });
     text += `[[IMG:${idx}]]`;
   }
 

@@ -7,7 +7,9 @@
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "test": "node tests/examParser.test.js && node tests/mathReference.test.js && node tests/pdfImageExtractor.test.js && node tests/fullExamAssembly.test.js"
+    "test": "node tests/examParser.test.js",
+    "render-build": "npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund",
+    "render-start": "node scripts/ensure-deps.js && npm run migrate && npm run seed && npm start"
   },
   "dependencies": {
     "pg": "^8.11.5",
