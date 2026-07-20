@@ -1,0 +1,185 @@
+<% var pageTitle = 'Xem trước & sửa trước khi lưu' %>
+<%- include('../../partials/admin-header') %>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h5 class="fw-bold mb-1">Xem trước & sửa trước khi lưu</h5>
+    <p class="small text-muted mb-0">
+      Nhận diện được <strong><%= rows.length %></strong> câu hỏi trên <strong><%= totalPages %></strong> trang.
+      Học sinh sẽ nhìn thấy nguyên trang PDF gốc — bảng bên dưới chỉ là <strong>thông tin để chấm điểm</strong>
+      (trang nào, đáp án đúng là gì), không phải nội dung hiển thị.
+    </p>
+  </div>
+  <a href="/admin/bai-kiem-tra/<%= quiz.id %>/tai-de" class="btn btn-outline-secondary btn-sm">Hủy, tải lại file khác</a>
+</div>
+
+<% if (error) { %><div class="alert alert-warning small"><%= error %></div><% } %>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card p-3" style="position:sticky; top:12px;">
+      <h6 class="fw-bold mb-2">Xem trước trang PDF</h6>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <button type="button" id="prevPageBtn" class="btn btn-outline-secondary btn-sm">&larr;</button>
+        <span class="small">Trang <input type="number" id="pageInput" value="1" min="1" max="<%= totalPages %>" style="width:60px" class="form-control form-control-sm d-inline-block text-center"> / <%= totalPages %></span>
+        <button type="button" id="nextPageBtn" class="btn btn-outline-secondary btn-sm">&rarr;</button>
+      </div>
+      <div id="pdfPreviewWrap" style="border:1px solid #eee; border-radius:8px; overflow:auto; max-height:70vh; text-align:center; background:#f8f8f8;">
+        <canvas id="pdfCanvas" style="max-width:100%;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <form method="POST" action="/admin/bai-kiem-tra/luu-de-import" id="reviewForm">
+      <input type="hidden" name="quiz_id" value="<%= quiz.id %>">
+      <input type="hidden" name="pdf_path" value="<%= pdfPath %>">
+      <input type="hidden" name="total_pages" value="<%= totalPages %>">
+      <input type="hidden" name="redirect_to" value="/admin/bai-kiem-tra/<%= quiz.id %>/cau-hoi">
+
+      <div class="card p-3 mb-2">
+        <button type="button" id="addRowBtn" class="btn btn-sm btn-outline-primary" style="width:fit-content">+ Thêm câu thủ công</button>
+      </div>
+
+      <div id="rowsWrap"></div>
+
+      <div class="card p-3 mt-2 d-flex flex-row gap-2">
+        <button class="btn btn-primary">Lưu đề thi</button>
+        <span class="small text-muted align-self-center">Ô "Trang" quyết định câu này hiện ra khi học sinh lật tới trang nào.</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .qrow{ border:1px solid #eee; border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fff; }
+  .qrow.needs-review{ border-color:#e0a800; background:#fffbea; }
+  .qrow .row-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .qrow input[type=number], .qrow select, .qrow input[type=text]{ font-size:.85rem; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const initialRows = <%- JSON.stringify(rows) %>;
+const pdfUrl = <%- JSON.stringify(pdfPath) %>;
+const totalPages = <%- totalPages %>;
+let rowSeq = 0;
+
+// ---- Xem truoc PDF (dung pdf.js, giong het co che dang dung o phan Doc sach online) ----
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfDoc = null;
+const canvas = document.getElementById('pdfCanvas');
+const ctx = canvas.getContext('2d');
+async function renderPage(n) {
+  if (!pdfDoc) return;
+  n = Math.min(Math.max(1, n), totalPages);
+  document.getElementById('pageInput').value = n;
+  const page = await pdfDoc.getPage(n);
+  const viewport = page.getViewport({ scale: 1.3 });
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+}
+pdfjsLib.getDocument(pdfUrl).promise.then(doc => { pdfDoc = doc; renderPage(1); });
+document.getElementById('prevPageBtn').onclick = () => renderPage(parseInt(document.getElementById('pageInput').value) - 1);
+document.getElementById('nextPageBtn').onclick = () => renderPage(parseInt(document.getElementById('pageInput').value) + 1);
+document.getElementById('pageInput').addEventListener('change', (e) => renderPage(parseInt(e.target.value) || 1));
+
+// ---- Bang cau hoi co the sua ----
+const typeLabels = { single_choice: 'Trắc nghiệm nhiều lựa chọn', true_false: 'Đúng / sai', short_answer: 'Trả lời ngắn', essay: 'Tự luận (chấm tay)' };
+
+function renderRow(row) {
+  const id = 'r' + (rowSeq++);
+  const needsReview = row.needsReview;
+  const correctAnswerText = row.correctAnswerText != null ? row.correctAnswerText : '';
+  const correctIndex = row.correctIndex != null ? row.correctIndex : 0;
+  const correctFlags = row.correctFlags || [false, false, false, false];
+  const optionCount = row.optionCount || 4;
+  const points = row.type === 'true_false' ? 1 : (row.type === 'essay' ? 2 : 0.25);
+
+  const div = document.createElement('div');
+  div.className = 'qrow' + (needsReview ? ' needs-review' : '');
+  div.innerHTML = `
+    <div class="row-head">
+      <input type="checkbox" name="questions[${id}][include]" checked>
+      <strong class="small">Câu ${row.number || ''}${row.section ? ' — Phần ' + row.section : ''}</strong>
+      ${needsReview ? '<span class="badge bg-warning text-dark">chưa rõ đáp án — kiểm tra lại</span>' : ''}
+      <button type="button" class="btn btn-sm btn-link text-danger ms-auto remove-row">Xóa</button>
+    </div>
+    <div class="row g-2">
+      <div class="col-auto">
+        <label class="form-label small mb-0">Trang</label>
+        <input type="number" name="questions[${id}][page]" value="${row.page || 1}" min="1" max="${totalPages}" class="form-control form-control-sm goto-page" style="width:70px">
+      </div>
+      <input type="hidden" name="questions[${id}][number]" value="${row.number || ''}">
+      <div class="col-auto">
+        <label class="form-label small mb-0">Dạng câu</label>
+        <select name="questions[${id}][type]" class="form-select form-select-sm type-select">
+          ${Object.entries(typeLabels).map(([v,l]) => `<option value="${v}" ${v===row.type?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-auto option-count-wrap">
+        <label class="form-label small mb-0">Số phương án</label>
+        <input type="number" name="questions[${id}][option_count]" value="${optionCount}" min="2" max="8" class="form-control form-control-sm" style="width:70px">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0">Điểm</label>
+        <input type="number" step="0.25" name="questions[${id}][points]" value="${points}" class="form-control form-control-sm" style="width:70px">
+      </div>
+    </div>
+    <div class="answer-area mt-2"></div>
+    <div class="row g-2 mt-1 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small mb-0">Trang lời giải (trong file PDF này)</label>
+        <input type="number" name="questions[${id}][solution_page]" value="${row.solutionPage || ''}" min="1" max="${totalPages}" class="form-control form-control-sm" style="width:80px" placeholder="—">
+      </div>
+      <div class="col-auto small text-muted" style="max-width:260px">
+        Học sinh sẽ được xem đúng trang này (ảnh PDF gốc, giữ nguyên công thức) sau khi nộp bài — không cần gõ lại lời giải.
+      </div>
+    </div>
+    <div class="mt-2">
+      <label class="form-label small mb-0">Ghi chú ngắn (tùy chọn — chỉ là chữ thường, không hiển thị được công thức)</label>
+      <textarea name="questions[${id}][explanation]" class="form-control form-control-sm" rows="1"></textarea>
+    </div>
+  `;
+
+  function renderAnswerArea() {
+    const type = div.querySelector('.type-select').value;
+    const area = div.querySelector('.answer-area');
+    const optCountEl = div.querySelector('.option-count-wrap');
+    if (type === 'single_choice') {
+      optCountEl.style.display = '';
+      const n = parseInt(div.querySelector('[name$="[option_count]"]').value) || 4;
+      const letters = 'ABCDEFGH'.slice(0, n).split('');
+      area.innerHTML = '<label class="form-label small mb-0">Đáp án đúng</label><div class="d-flex gap-2 flex-wrap">' +
+        letters.map((l, i) => `<label class="small"><input type="radio" name="questions[${id}][correct_index]" value="${i}" ${i===correctIndex?'checked':''}> ${l}</label>`).join('') + '</div>';
+    } else if (type === 'true_false') {
+      optCountEl.style.display = '';
+      const n = parseInt(div.querySelector('[name$="[option_count]"]').value) || 4;
+      const letters = 'abcdefgh'.slice(0, n).split('');
+      area.innerHTML = '<label class="form-label small mb-0">Ý nào đúng</label><div class="d-flex gap-2 flex-wrap">' +
+        letters.map((l, i) => `<label class="small"><input type="checkbox" name="questions[${id}][tf_correct][]" value="${i}" ${correctFlags[i]?'checked':''}> ${l}</label>`).join('') + '</div>';
+    } else if (type === 'short_answer') {
+      optCountEl.style.display = 'none';
+      area.innerHTML = `<label class="form-label small mb-0">Đáp án đúng</label><input type="text" name="questions[${id}][correct_answer]" value="${correctAnswerText.replace(/"/g,'&quot;')}" class="form-control form-control-sm" style="max-width:200px">`;
+    } else {
+      optCountEl.style.display = 'none';
+      area.innerHTML = '<span class="small text-muted">Câu tự luận — giáo viên chấm tay sau khi học sinh nộp bài.</span>';
+    }
+  }
+  div.querySelector('.type-select').addEventListener('change', renderAnswerArea);
+  div.querySelector('[name$="[option_count]"]').addEventListener('input', renderAnswerArea);
+  div.querySelector('.remove-row').addEventListener('click', () => div.remove());
+  div.querySelector('.goto-page').addEventListener('change', (e) => renderPage(parseInt(e.target.value) || 1));
+  renderAnswerArea();
+  return div;
+}
+
+const rowsWrap = document.getElementById('rowsWrap');
+initialRows.forEach(row => rowsWrap.appendChild(renderRow(row)));
+document.getElementById('addRowBtn').addEventListener('click', () => {
+  rowsWrap.appendChild(renderRow({ type: 'single_choice', page: parseInt(document.getElementById('pageInput').value) || 1, optionCount: 4 }));
+});
+</script>
+
+<%- include('../../partials/admin-footer') %>
